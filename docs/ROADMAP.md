@@ -11,21 +11,21 @@ The roadmap is deliberately ordered by safety. Autonomous financial capability e
 - [x] Sovereign Reserve boundary
 - [x] Threat model
 - [x] CI
-- [ ] Structured audit event model
-- [ ] Configuration model
+- [x] Structured audit event model
+- [x] Configuration/capability model
 - [ ] Formal security invariants
 
 ## 1 — Financial Sandbox
 
-- [ ] Simulated accounts
-- [ ] Simulated transactions
+- [x] Simulated accounts
+- [x] Simulated transactions
 - [ ] Agent intent planner
-- [ ] Policy evaluation API
-- [ ] Risk scoring API
+- [x] Policy evaluation API
+- [x] Risk scoring API
 - [ ] Simulated bill payments
 - [ ] Simulated investment allocation
-- [ ] Reserve accumulation simulation
-- [ ] Adversarial test suite
+- [x] Reserve accumulation simulation boundary
+- [x] Initial adversarial/security tests
 
 ## 2 — Crypto Testnet
 
