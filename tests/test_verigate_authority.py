@@ -87,7 +87,7 @@ class VerigateAuthorityAdapterTest(unittest.TestCase):
             agent_id="agent-1",
             identity_id="identity-1",
             capability_id="cap-1",
-            sign_action=lambda _: "agent-signature",
+            sign_action=lambda _identity_id, _action: "agent-signature",
         )
         return intent, adapter
 
