@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+import time
 import unittest
 from decimal import Decimal
 from uuid import uuid4
@@ -67,8 +68,8 @@ class VerigateAuthorityAdapterTest(unittest.TestCase):
             "policy_sha256": "a" * 64,
             "capability_id": "cap-1",
             "capability_sha256": "b" * 64,
-            "issued_at": 1000,
-            "expires_at": 1300,
+            "issued_at": int(time.time()) - 1,
+            "expires_at": int(time.time()) + 300,
             "nonce": str(intent.id),
             "action": action,
         }
