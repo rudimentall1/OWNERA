@@ -40,6 +40,25 @@ class PaymentIntent:
     idempotency_key: str = ""
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+    def to_financial_action(self, agent_id: str) -> "FinancialAction":
+        """Create the exact authority-bound representation of this intent."""
+        from .financial_action import FinancialAction
+
+        if not agent_id.strip():
+            raise ValueError("agent_id is required")
+        if not self.idempotency_key:
+            raise ValueError("idempotency key is required")
+        return FinancialAction(
+            intent_id=self.id,
+            agent_id=agent_id,
+            action_type="payment",
+            destination=self.destination,
+            amount=self.amount.amount,
+            currency=self.amount.currency,
+            purpose=self.purpose,
+            idempotency_key=self.idempotency_key,
+        )
+
 
 @dataclass(frozen=True)
 class PolicyResult:
