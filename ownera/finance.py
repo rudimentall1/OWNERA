@@ -60,7 +60,7 @@ class Account:
     name: str
     kind: AccountKind
     currency: str
-    id: UUID = uuid4()
+    id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -87,7 +87,7 @@ class Liability:
     amount: Decimal
     currency: str
     due_date: date | None = None
-    id: UUID = uuid4()
+    id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -106,7 +106,7 @@ class Obligation:
     due_date: date
     destination: str
     status: ObligationStatus = ObligationStatus.SCHEDULED
-    id: UUID = uuid4()
+    id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -125,7 +125,7 @@ class Position:
     asset_id: UUID
     quantity: Decimal
     average_cost: Decimal | None = None
-    id: UUID = uuid4()
+    id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
         if self.quantity < 0:
