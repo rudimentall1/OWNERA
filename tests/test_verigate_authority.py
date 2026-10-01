@@ -124,9 +124,6 @@ class VerigateAuthorityAdapterTest(unittest.TestCase):
         verdict = AuthorizationDecision(intent.id, Decision.ALLOW, (), uuid4())
         authorization = adapter.issue(intent, verdict, policy_version="v1")
         adapter.transport.authorization = {
-            **adapter.transport.authorization,
-        }
-        adapter.transport.authorization = {
             "payload": authorization.provider_authorization["payload"],
             "signature": authorization.provider_authorization["signature"],
             "algorithm": "Ed25519",
@@ -142,8 +139,10 @@ class VerigateAuthorityAdapterTest(unittest.TestCase):
         intent, adapter = self._intent_and_adapter()
         verdict = AuthorizationDecision(intent.id, Decision.ALLOW, (), uuid4())
         envelope = adapter.transport.authorization
-        envelope["signature"] = base64.b64encode(Ed25519PrivateKey.generate().sign(canonical(envelope["payload"]))).decode()
-        with self.assertRaises(Exception):
+        envelope["signature"] = base64.b64encode(
+            Ed25519PrivateKey.generate().sign(canonical(envelope["payload"]))
+        ).decode()
+        with self.assertRaises(AuthorizationError):
             adapter.issue(intent, verdict, policy_version="v1")
 
 
