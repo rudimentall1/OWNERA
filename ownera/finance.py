@@ -6,7 +6,7 @@ They contain no bank, broker, blockchain, model, or provider assumptions.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from enum import Enum
@@ -46,7 +46,7 @@ class Asset:
     symbol: str
     kind: AssetKind
     decimals: int = 2
-    id: UUID = uuid4()
+    id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
         if not self.symbol.strip():
