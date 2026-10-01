@@ -64,6 +64,18 @@ def test_due_obligation_becomes_deterministic_payment_intent_candidate() -> None
     assert intent.idempotency_key == f"obligation:{obligation.id}:2026-01-31"
 
 
+def test_same_schedule_date_produces_same_occurrence_identity() -> None:
+    book = ObligationBook()
+    schedule = make_schedule()
+    book.register(schedule)
+
+    first = book.due_on(date(2026, 1, 31))[0]
+    second = book.due_on(date(2026, 1, 31))[0]
+
+    assert first.id == second.id
+    assert book.to_payment_intent(first).idempotency_key == book.to_payment_intent(second).idempotency_key
+
+
 def test_non_due_obligation_cannot_become_payment_intent() -> None:
     obligation = Obligation(
         name="Rent",
