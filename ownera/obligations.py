@@ -14,6 +14,7 @@ from decimal import Decimal
 from enum import Enum
 from uuid import UUID, uuid4
 
+from .domain import Money, PaymentIntent
 from .finance import Obligation, ObligationStatus
 
 
@@ -121,3 +122,16 @@ class ObligationBook:
 
     def all(self) -> tuple[RecurringObligation, ...]:
         return tuple(self._schedules.values())
+
+    @staticmethod
+    def to_payment_intent(obligation: Obligation) -> PaymentIntent:
+        """Convert a due obligation into an intent candidate, never an authorization."""
+        if obligation.status != ObligationStatus.DUE:
+            raise ValueError("only due obligations can become payment intents")
+        return PaymentIntent(
+            amount=Money(obligation.amount, obligation.currency),
+            destination=obligation.destination,
+            purpose=f"obligation:{obligation.name}",
+            obligation_id=obligation.id,
+            idempotency_key=f"obligation:{obligation.id}:{obligation.due_date.isoformat()}",
+        )
