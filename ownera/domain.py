@@ -35,6 +35,7 @@ class PaymentIntent:
     amount: Money
     destination: str
     purpose: str
+    obligation_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     idempotency_key: str = ""
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
