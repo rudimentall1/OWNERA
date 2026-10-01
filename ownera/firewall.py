@@ -60,7 +60,7 @@ class TransactionFirewall:
         policy = self._config.policy.evaluate(intent, daily_spend=daily_spend)
         risk = self._risk.evaluate(intent)
         decision = authorize(policy, risk)
-        reasons = tuple((*policy.reasons, *risk.reasons))
+        reasons = (*policy.reasons, *risk.reasons)
         self._audit.append(AuditEvent(
             event_type="authorization.evaluated",
             actor="firewall",
