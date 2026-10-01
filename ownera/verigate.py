@@ -139,7 +139,7 @@ class VerigateAuthorityAdapter:
     agent_id: str
     identity_id: str
     capability_id: str
-    sign_action: Callable[[dict[str, Any]], str]
+    sign_action: Callable[[str, dict[str, Any]], str]
     consumed: set[str]
 
     @classmethod
@@ -151,7 +151,7 @@ class VerigateAuthorityAdapter:
         agent_id: str,
         identity_id: str,
         capability_id: str,
-        sign_action: Callable[[dict[str, Any]], str],
+        sign_action: Callable[[str, dict[str, Any]], str],
     ) -> VerigateAuthorityAdapter:
         if not agent_id.strip():
             raise ValueError("agent_id is required")
@@ -184,7 +184,7 @@ class VerigateAuthorityAdapter:
             metadata={"ownera_policy_version": policy_version},
             intent_id=str(intent.id),
         )
-        agent_signature = self.sign_action(action)
+        agent_signature = self.sign_action(self.identity_id, action)
         response = self.transport.request(
             "/v1/actions/authorize",
             {
