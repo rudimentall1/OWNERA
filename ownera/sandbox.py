@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from uuid import uuid4
 
 from .audit import AuditEvent
 from .authority import AuthorityPort, LocalAuthorityAdapter
 from .authorization import AuthorizationError, ExecutionAuthorization
 from .domain import Decision, Money, PaymentIntent
+from .evidence import ExecutionEvidence
 from .firewall import TransactionFirewall
 from .receipt import ExecutionReceipt
 
@@ -20,6 +22,7 @@ class SimulatedPayment:
     committed: bool
     authorization: ExecutionAuthorization | None = None
     receipt: ExecutionReceipt | None = None
+    evidence: ExecutionEvidence | None = None
 
 
 class SandboxTreasury:
@@ -111,12 +114,20 @@ class SandboxTreasury:
             currency=intent.amount.currency,
             destination=intent.destination,
         )
+        action = intent.to_financial_action(self._authority.agent_id)
+        evidence = ExecutionEvidence.from_execution(
+            action,
+            authorization,
+            receipt,
+            evidence_id=uuid4(),
+        )
         self._firewall.audit.append(
             AuditEvent(
                 event_type="execution.committed",
                 actor="sandbox",
                 correlation_id=verdict.correlation_id,
-                payload_hash=f"intent:{intent.id}",
+                payload_hash=evidence.evidence_sha256,
+                policy_version=self._firewall.policy_version,
             )
         )
         return SimulatedPayment(
@@ -125,4 +136,5 @@ class SandboxTreasury:
             True,
             authorization=authorization,
             receipt=receipt,
+            evidence=evidence,
         )
