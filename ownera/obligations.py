@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 from enum import Enum
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 from .domain import Money, PaymentIntent
 from .finance import Obligation, ObligationStatus
@@ -108,6 +108,7 @@ class ObligationBook:
             if current != day:
                 continue
 
+            occurrence_id = uuid5(schedule.id, day.isoformat())
             obligations.append(
                 Obligation(
                     name=schedule.name,
@@ -116,6 +117,7 @@ class ObligationBook:
                     due_date=day,
                     destination=schedule.destination,
                     status=ObligationStatus.DUE,
+                    id=occurrence_id,
                 )
             )
         return tuple(obligations)
