@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -65,7 +66,7 @@ def test_liability_and_position_are_distinct_financial_concepts() -> None:
     [
         lambda: Asset("", AssetKind.CASH),
         lambda: Account("", AccountKind.CASH, "EUR"),
-        lambda: Balance(__import__("uuid").uuid4(), __import__("uuid").uuid4(), Decimal("-1")),
+        lambda: Balance(uuid4(), __import__("uuid").uuid4(), Decimal("-1")),
         lambda: Liability("Debt", LiabilityKind.DEBT, Decimal("-1"), "EUR"),
         lambda: Obligation("Bill", Decimal("0"), "EUR", date(2026, 10, 5), "vendor"),
         lambda: Position(__import__("uuid").uuid4(), __import__("uuid").uuid4(), Decimal("-1")),
