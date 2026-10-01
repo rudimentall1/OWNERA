@@ -14,9 +14,10 @@ import hashlib
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from cryptography.exceptions import InvalidSignature
