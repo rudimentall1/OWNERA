@@ -7,7 +7,7 @@ from decimal import Decimal
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from ownera.domain import Decision
-from ownera.firewall import AuthorizationDecision, FirewallConfig, TransactionFirewall
+from ownera.firewall import FirewallConfig, TransactionFirewall
 from ownera.sandbox import SandboxTreasury
 from ownera.security import SpendingPolicy
 from ownera.verigate import VerigateAuthorityAdapter
@@ -50,7 +50,9 @@ class FakeVerigate:
         return {
             "execution_authorization": {
                 "payload": payload,
-                "signature": base64.b64encode(self.issuer.sign(canonical(payload))).decode(),
+                "signature": base64.b64encode(
+                    self.issuer.sign(canonical(payload))
+                ).decode(),
                 "algorithm": "Ed25519",
             }
         }
