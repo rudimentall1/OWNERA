@@ -44,13 +44,15 @@ class TransactionFirewall:
         if self._ledger.contains_idempotency_key(intent.idempotency_key):
             decision = Decision.DENY
             reasons = ("duplicate_idempotency_key",)
-            self._audit.append(AuditEvent(
-                event_type="authorization.rejected",
-                actor="firewall",
-                correlation_id=correlation_id,
-                payload_hash=f"intent:{intent.id}",
-                policy_version=self._config.policy.policy_version,
-            ))
+            self._audit.append(
+                AuditEvent(
+                    event_type="authorization.rejected",
+                    actor="firewall",
+                    correlation_id=correlation_id,
+                    payload_hash=f"intent:{intent.id}",
+                    policy_version=self._config.policy.policy_version,
+                )
+            )
             return AuthorizationDecision(intent.id, decision, reasons, correlation_id)
 
         daily_spend = self._ledger.total_for_date(
@@ -61,14 +63,20 @@ class TransactionFirewall:
         risk = self._risk.evaluate(intent)
         decision = authorize(policy, risk)
         reasons = (*policy.reasons, *risk.reasons)
-        self._audit.append(AuditEvent(
-            event_type="authorization.evaluated",
-            actor="firewall",
-            correlation_id=correlation_id,
-            payload_hash=f"intent:{intent.id}",
-            policy_version=policy.policy_version,
-        ))
+        self._audit.append(
+            AuditEvent(
+                event_type="authorization.evaluated",
+                actor="firewall",
+                correlation_id=correlation_id,
+                payload_hash=f"intent:{intent.id}",
+                policy_version=policy.policy_version,
+            )
+        )
         return AuthorizationDecision(intent.id, decision, reasons, correlation_id)
+
+    @property
+    def policy_version(self) -> str:
+        return self._config.policy.policy_version
 
     @property
     def audit(self) -> AuditLog:
