@@ -22,6 +22,9 @@ The roadmap is deliberately ordered by safety. Autonomous financial capability e
 - [ ] Agent intent planner
 - [x] Policy evaluation API
 - [x] Risk scoring API
+- [x] Idempotency / replay protection in sandbox
+- [x] Daily spend limit enforcement in sandbox
+- [x] Pre/post execution audit events
 - [ ] Simulated bill payments
 - [ ] Simulated investment allocation
 - [x] Reserve accumulation simulation boundary
