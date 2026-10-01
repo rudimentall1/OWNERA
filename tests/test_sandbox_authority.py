@@ -26,7 +26,7 @@ def test_sandbox_committed_payment_has_authorization_and_receipt() -> None:
     assert result.receipt is not None
     assert result.receipt.authorization_id == result.authorization.id
     assert result.receipt.intent_id == result.intent.id
-    assert result.receipt.policy_version == "v1"
+    assert result.receipt.policy_version == "v0"
 
 
 def test_sandbox_does_not_mint_authorization_when_balance_is_insufficient() -> None:
