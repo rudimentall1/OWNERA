@@ -46,7 +46,7 @@ class LocalAuthorityAdapter:
     issuer: AuthorizationIssuer
 
     @classmethod
-    def create(cls, ttl_seconds: int = 60) -> "LocalAuthorityAdapter":
+    def create(cls, ttl_seconds: int = 60) -> LocalAuthorityAdapter:
         return cls(AuthorizationIssuer(ttl_seconds=ttl_seconds))
 
     def issue(
