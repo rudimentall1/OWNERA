@@ -3,8 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from ownera.authorization import AuthorizationError
 from ownera.authority import LocalAuthorityAdapter
+from ownera.authorization import AuthorizationError
 from ownera.domain import Decision, Money, PaymentIntent
 from ownera.firewall import AuthorizationDecision
 
