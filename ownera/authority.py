@@ -19,6 +19,10 @@ from .firewall import AuthorizationDecision
 class AuthorityPort(Protocol):
     """Minimum authority contract required by the financial execution layer."""
 
+    @property
+    def agent_id(self) -> str:
+        ...
+
     def issue(
         self,
         intent: PaymentIntent,
@@ -44,10 +48,15 @@ class LocalAuthorityAdapter:
     """Sandbox adapter used until OWNERA is connected to Verigate."""
 
     issuer: AuthorizationIssuer
+    agent_id: str = "ownera-sandbox"
 
     @classmethod
-    def create(cls, ttl_seconds: int = 60) -> LocalAuthorityAdapter:
-        return cls(AuthorizationIssuer(ttl_seconds=ttl_seconds))
+    def create(
+        cls,
+        ttl_seconds: int = 60,
+        agent_id: str = "ownera-sandbox",
+    ) -> LocalAuthorityAdapter:
+        return cls(AuthorizationIssuer(ttl_seconds=ttl_seconds), agent_id=agent_id)
 
     def issue(
         self,
