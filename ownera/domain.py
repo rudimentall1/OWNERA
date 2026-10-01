@@ -8,6 +8,8 @@ from decimal import Decimal
 from enum import Enum
 from uuid import UUID, uuid4
 
+from .financial_action import FinancialAction
+
 
 class Decision(str, Enum):
     ALLOW = "ALLOW"
@@ -40,10 +42,8 @@ class PaymentIntent:
     idempotency_key: str = ""
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def to_financial_action(self, agent_id: str) -> "FinancialAction":
+    def to_financial_action(self, agent_id: str) -> FinancialAction:
         """Create the exact authority-bound representation of this intent."""
-        from .financial_action import FinancialAction
-
         if not agent_id.strip():
             raise ValueError("agent_id is required")
         if not self.idempotency_key:
