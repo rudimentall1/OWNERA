@@ -82,6 +82,7 @@ class ObligationBook:
     """In-memory schedule registry for the financial sandbox."""
 
     _schedules: dict[UUID, RecurringObligation] = field(default_factory=dict)
+    _paid_occurrences: set[UUID] = field(default_factory=set)
 
     def register(self, schedule: RecurringObligation) -> UUID:
         if schedule.id in self._schedules:
@@ -109,6 +110,8 @@ class ObligationBook:
                 continue
 
             occurrence_id = uuid5(schedule.id, day.isoformat())
+            if occurrence_id in self._paid_occurrences:
+                continue
             obligations.append(
                 Obligation(
                     name=schedule.name,
