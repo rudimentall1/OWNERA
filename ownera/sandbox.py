@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from .audit import AuditEvent
-from .authorization import AuthorizationError, ExecutionAuthorization
 from .authority import AuthorityPort, LocalAuthorityAdapter
+from .authorization import AuthorizationError, ExecutionAuthorization
 from .domain import Decision, Money, PaymentIntent
 from .firewall import TransactionFirewall
 from .receipt import ExecutionReceipt
