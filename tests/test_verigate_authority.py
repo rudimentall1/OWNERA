@@ -135,7 +135,7 @@ class VerigateAuthorityAdapterTest(unittest.TestCase):
             "execute": False,
             "reason": "replay",
         }
-        with self.assertRaises(Exception):
+        with self.assertRaises(AuthorizationError):
             adapter.consume(authorization, intent)
 
     def test_invalid_signature_is_rejected(self):
