@@ -49,6 +49,13 @@ class SandboxTreasury:
             purpose=purpose,
             idempotency_key=idempotency_key or f"sandbox:{destination}:{amount}:{purpose}",
         )
+        return self.execute_intent(intent)
+
+    def execute_intent(self, intent: PaymentIntent) -> SimulatedPayment:
+        """Evaluate and execute an already-constructed intent through the full boundary."""
+        if intent.amount.currency != self.currency:
+            return SimulatedPayment(intent, Decision.DENY, False)
+
         verdict = self._firewall.evaluate(intent)
 
         if verdict.decision != Decision.ALLOW:
@@ -62,7 +69,7 @@ class SandboxTreasury:
             )
             return SimulatedPayment(intent, verdict.decision, False)
 
-        if amount > self.balance:
+        if intent.amount.amount > self.balance:
             self._firewall.audit.append(
                 AuditEvent(
                     event_type="execution.rejected",
@@ -96,13 +103,13 @@ class SandboxTreasury:
                 authorization=authorization,
             )
 
-        self.balance -= amount
+        self.balance -= intent.amount.amount
         self._firewall.ledger.append(intent)
         receipt = ExecutionReceipt.committed(
             authorization,
-            amount=amount,
-            currency=self.currency,
-            destination=destination,
+            amount=intent.amount.amount,
+            currency=intent.amount.currency,
+            destination=intent.destination,
         )
         self._firewall.audit.append(
             AuditEvent(
