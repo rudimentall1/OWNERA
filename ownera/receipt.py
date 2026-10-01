@@ -35,7 +35,7 @@ class ExecutionReceipt:
         currency: str,
         destination: str,
         executed_at: datetime | None = None,
-    ) -> "ExecutionReceipt":
+    ) -> ExecutionReceipt:
         return cls(
             authorization_id=authorization.id,
             intent_id=authorization.intent_id,
