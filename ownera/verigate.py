@@ -84,13 +84,12 @@ def _verify_signature(envelope: dict[str, Any], public_key: Ed25519PublicKey) ->
         raise AuthorizationError("invalid Verigate authorization signature") from exc
 
 
-def _require_uuid(value: Any, field: str) -> UUID:
-    if not isinstance(value, str):
+def _require_fingerprint(value: Any, field: str) -> str:
+    if not isinstance(value, str) or len(value) != 64:
         raise AuthorizationError(f"invalid Verigate authorization field: {field}")
-    try:
-        return UUID(value)
-    except ValueError as exc:
-        raise AuthorizationError(f"invalid Verigate authorization field: {field}") from exc
+    if any(char not in "0123456789abcdef" for char in value):
+        raise AuthorizationError(f"invalid Verigate authorization field: {field}")
+    return value
 
 
 def _parse_datetime(value: Any, field: str) -> datetime:
@@ -137,6 +136,8 @@ class VerigateAuthorityAdapter:
     transport: VerigateTransport
     issuer_public_key: Ed25519PublicKey
     agent_id: str
+    identity_id: str
+    capability_id: str
     sign_action: Callable[[dict[str, Any]], str]
     consumed: set[str]
 
@@ -147,6 +148,8 @@ class VerigateAuthorityAdapter:
         issuer_public_key: Ed25519PublicKey,
         *,
         agent_id: str,
+        identity_id: str,
+        capability_id: str,
         sign_action: Callable[[dict[str, Any]], str],
     ) -> "VerigateAuthorityAdapter":
         if not agent_id.strip():
@@ -155,6 +158,8 @@ class VerigateAuthorityAdapter:
             transport=transport,
             issuer_public_key=issuer_public_key,
             agent_id=agent_id,
+            identity_id=identity_id,
+            capability_id=capability_id,
             sign_action=sign_action,
             consumed=set(),
         )
@@ -182,8 +187,8 @@ class VerigateAuthorityAdapter:
         response = self.transport.request(
             "/v1/actions/authorize",
             {
-                "identity_id": "",
-                "capability_id": "",
+                "identity_id": self.identity_id,
+                "capability_id": self.capability_id,
                 "agent_id": self.agent_id,
                 "agent_signature": agent_signature,
                 "intent_id": action["intent_id"],
@@ -231,13 +236,13 @@ class VerigateAuthorityAdapter:
 
         issued_at = _parse_datetime(payload.get("issued_at"), "issued_at")
         expires_at = _parse_datetime(payload.get("expires_at"), "expires_at")
-        authorization_id = _require_uuid(payload.get("authorization_id"), "authorization_id")
+        authorization_id = _require_fingerprint(payload.get("authorization_id"), "authorization_id")
 
         # Verigate's authorization_id is normally a SHA-256 fingerprint rather
         # than a UUID. Keep the local artifact identifier stable by deriving a
         # UUID from that signed identifier; the signed provider artifact remains
         # available through provider_authorization below.
-        local_id = UUID(bytes=hashlib.sha256(str(authorization_id).encode()).digest()[:16])
+        local_id = UUID(bytes=hashlib.sha256(authorization_id.encode()).digest()[:16])
         correlation_id = verdict.correlation_id
         return ExecutionAuthorization(
             id=local_id,
