@@ -122,6 +122,14 @@ class ObligationBook:
             )
         return tuple(obligations)
 
+    def mark_paid(self, obligation: Obligation) -> None:
+        if obligation.status != ObligationStatus.DUE:
+            raise ValueError("only due obligations can be marked paid")
+        self._paid_occurrences.add(obligation.id)
+
+    def is_paid(self, obligation: Obligation) -> bool:
+        return obligation.id in self._paid_occurrences
+
     def all(self) -> tuple[RecurringObligation, ...]:
         return tuple(self._schedules.values())
 
