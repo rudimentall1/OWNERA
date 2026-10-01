@@ -6,8 +6,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from .audit import AuditEvent
+from .authorization import AuthorizationError, ExecutionAuthorization
+from .authority import AuthorityPort, LocalAuthorityAdapter
 from .domain import Decision, Money, PaymentIntent
 from .firewall import TransactionFirewall
+from .receipt import ExecutionReceipt
 
 
 @dataclass(frozen=True)
@@ -15,11 +18,20 @@ class SimulatedPayment:
     intent: PaymentIntent
     decision: Decision
     committed: bool
+    authorization: ExecutionAuthorization | None = None
+    receipt: ExecutionReceipt | None = None
 
 
 class SandboxTreasury:
-    def __init__(self, firewall: TransactionFirewall, balance: Decimal = Decimal("0"), currency: str = "EUR") -> None:
+    def __init__(
+        self,
+        firewall: TransactionFirewall,
+        balance: Decimal = Decimal("0"),
+        currency: str = "EUR",
+        authority: AuthorityPort | None = None,
+    ) -> None:
         self._firewall = firewall
+        self._authority = authority or LocalAuthorityAdapter.create()
         self.balance = balance
         self.currency = currency
 
@@ -40,29 +52,70 @@ class SandboxTreasury:
         verdict = self._firewall.evaluate(intent)
 
         if verdict.decision != Decision.ALLOW:
-            self._firewall.audit.append(AuditEvent(
-                event_type="execution.rejected",
-                actor="sandbox",
-                correlation_id=verdict.correlation_id,
-                payload_hash=f"intent:{intent.id}",
-            ))
+            self._firewall.audit.append(
+                AuditEvent(
+                    event_type="execution.rejected",
+                    actor="sandbox",
+                    correlation_id=verdict.correlation_id,
+                    payload_hash=f"intent:{intent.id}",
+                )
+            )
             return SimulatedPayment(intent, verdict.decision, False)
 
         if amount > self.balance:
-            self._firewall.audit.append(AuditEvent(
-                event_type="execution.rejected",
-                actor="sandbox",
-                correlation_id=verdict.correlation_id,
-                payload_hash=f"intent:{intent.id}",
-            ))
+            self._firewall.audit.append(
+                AuditEvent(
+                    event_type="execution.rejected",
+                    actor="sandbox",
+                    correlation_id=verdict.correlation_id,
+                    payload_hash=f"intent:{intent.id}",
+                )
+            )
             return SimulatedPayment(intent, Decision.REVIEW, False)
+
+        authorization = self._authority.issue(
+            intent,
+            verdict,
+            policy_version=self._firewall.policy_version,
+        )
+        try:
+            self._authority.consume(authorization, intent)
+        except AuthorizationError:
+            self._firewall.audit.append(
+                AuditEvent(
+                    event_type="execution.rejected",
+                    actor="sandbox",
+                    correlation_id=verdict.correlation_id,
+                    payload_hash=f"intent:{intent.id}",
+                )
+            )
+            return SimulatedPayment(
+                intent,
+                Decision.DENY,
+                False,
+                authorization=authorization,
+            )
 
         self.balance -= amount
         self._firewall.ledger.append(intent)
-        self._firewall.audit.append(AuditEvent(
-            event_type="execution.committed",
-            actor="sandbox",
-            correlation_id=verdict.correlation_id,
-            payload_hash=f"intent:{intent.id}",
-        ))
-        return SimulatedPayment(intent, Decision.ALLOW, True)
+        receipt = ExecutionReceipt.committed(
+            authorization,
+            amount=amount,
+            currency=self.currency,
+            destination=destination,
+        )
+        self._firewall.audit.append(
+            AuditEvent(
+                event_type="execution.committed",
+                actor="sandbox",
+                correlation_id=verdict.correlation_id,
+                payload_hash=f"intent:{intent.id}",
+            )
+        )
+        return SimulatedPayment(
+            intent,
+            Decision.ALLOW,
+            True,
+            authorization=authorization,
+            receipt=receipt,
+        )
