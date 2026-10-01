@@ -2,8 +2,8 @@ from decimal import Decimal
 
 from ownera.domain import Decision
 from ownera.firewall import FirewallConfig, TransactionFirewall
-from ownera.security import SpendingPolicy
 from ownera.sandbox import SandboxTreasury
+from ownera.security import SpendingPolicy
 
 
 def test_firewall_allows_small_payment() -> None:
