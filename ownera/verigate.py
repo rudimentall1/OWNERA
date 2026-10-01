@@ -151,7 +151,7 @@ class VerigateAuthorityAdapter:
         identity_id: str,
         capability_id: str,
         sign_action: Callable[[dict[str, Any]], str],
-    ) -> "VerigateAuthorityAdapter":
+    ) -> VerigateAuthorityAdapter:
         if not agent_id.strip():
             raise ValueError("agent_id is required")
         return cls(
