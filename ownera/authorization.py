@@ -27,6 +27,8 @@ class ExecutionAuthorization:
     issued_at: datetime
     expires_at: datetime
     nonce: str
+    provider: str = "local"
+    provider_authorization: dict | None = None
 
     def is_valid_at(self, now: datetime | None = None) -> bool:
         now = now or datetime.now(timezone.utc)
