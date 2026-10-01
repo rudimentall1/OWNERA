@@ -4,9 +4,8 @@ from decimal import Decimal
 import pytest
 
 from ownera.domain import PaymentIntent
-from ownera.finance import ObligationStatus
-from ownera.obligations import ObligationBook, Recurrence, RecurringObligation
-from ownera.obligations import due_date
+from ownera.finance import Obligation, ObligationStatus
+from ownera.obligations import ObligationBook, Recurrence, RecurringObligation, due_date
 
 
 def make_schedule(**overrides: object) -> RecurringObligation:
