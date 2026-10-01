@@ -7,8 +7,8 @@ from decimal import Decimal
 from uuid import uuid4
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives import serialization
 
+from ownera.authorization import AuthorizationError
 from ownera.domain import Decision, Money, PaymentIntent
 from ownera.firewall import AuthorizationDecision
 from ownera.verigate import VerigateAuthorityAdapter
@@ -115,7 +115,7 @@ class VerigateAuthorityAdapterTest(unittest.TestCase):
         verdict = AuthorizationDecision(intent.id, Decision.ALLOW, (), uuid4())
         original = adapter.transport.authorization["payload"]["action"]["amount_exact"]
         adapter.transport.authorization["payload"]["action"]["amount_exact"] = "0.1"
-        with self.assertRaises(Exception):
+        with self.assertRaises(AuthorizationError):
             adapter.issue(intent, verdict, policy_version="v1")
         adapter.transport.authorization["payload"]["action"]["amount_exact"] = original
 
