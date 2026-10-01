@@ -46,3 +46,23 @@ def test_financial_action_digest_changes_when_amount_changes() -> None:
     )
 
     assert base.digest() != changed.digest()
+
+
+def test_payment_intent_maps_to_exact_financial_action() -> None:
+    from decimal import Decimal
+
+    from ownera.domain import Money, PaymentIntent
+
+    intent = PaymentIntent(
+        amount=Money(Decimal("19.990000000000000001"), "EUR"),
+        destination="merchant",
+        purpose="invoice",
+        idempotency_key="invoice-1",
+    )
+
+    action = intent.to_financial_action("agent-1")
+
+    assert action.intent_id == intent.id
+    assert action.amount == Decimal("19.990000000000000001")
+    assert action.currency == "EUR"
+    assert action.digest()
