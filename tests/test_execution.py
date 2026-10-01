@@ -45,7 +45,7 @@ def test_due_obligation_executes_end_to_end_and_becomes_paid() -> None:
 
 
 def test_paid_obligation_is_not_executed_again() -> None:
-    book, service = make_service()
+    _, service = make_service()
 
     first = service.execute_due(date(2026, 10, 1))
     second = service.execute_due(date(2026, 10, 1))
