@@ -25,6 +25,7 @@ The roadmap is deliberately ordered by safety. Autonomous financial capability e
 - [x] Idempotency / replay protection in sandbox
 - [x] Daily spend limit enforcement in sandbox
 - [x] Pre/post execution audit events
+- [x] Recurring obligation scheduling
 - [ ] Simulated bill payments
 - [ ] Simulated investment allocation
 - [x] Reserve accumulation simulation boundary
