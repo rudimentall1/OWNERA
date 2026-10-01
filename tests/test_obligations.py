@@ -66,15 +66,12 @@ def test_due_obligation_becomes_deterministic_payment_intent_candidate() -> None
 
 
 def test_non_due_obligation_cannot_become_payment_intent() -> None:
-    obligation = book_obligation = ObligationBook().due_on(date(2026, 1, 31))
-    assert obligation == ()
+    obligation = Obligation(
+        name="Rent",
+        amount=Decimal("1200"),
+        currency="EUR",
+        due_date=date(2026, 1, 31),
+        destination="landlord",
+    )
     with pytest.raises(ValueError, match="only due"):
-        ObligationBook.to_payment_intent(
-            __import__("ownera.finance", fromlist=["Obligation"]).Obligation(
-                name="Rent",
-                amount=Decimal("1200"),
-                currency="EUR",
-                due_date=date(2026, 1, 31),
-                destination="landlord",
-            )
-        )
+        ObligationBook.to_payment_intent(obligation)
