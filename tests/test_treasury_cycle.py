@@ -96,3 +96,35 @@ def test_autonomous_cycle_second_observation_is_stable_at_target() -> None:
     )
     assert second.proposal_created is False
     assert second.trade is None
+
+
+def test_cycle_rejects_stale_market_before_proposal() -> None:
+    cycle = _cycle()
+    result = cycle.run_once(
+        MarketSnapshot(
+            {"BTC": Decimal("60000")},
+            datetime(2026, 10, 4, tzinfo=timezone.utc),
+        ),
+        now=datetime(2026, 10, 4, 0, 6, tzinfo=timezone.utc),
+    )
+
+    assert result.market_accepted is False
+    assert result.rejection_reason == "market_data_stale"
+    assert result.proposal_created is False
+    assert result.trade is None
+    assert cycle.sandbox.portfolio.cash == Decimal("7000")
+    assert cycle.last_result is result
+
+
+def test_cycle_remembers_verified_execution() -> None:
+    cycle = _cycle()
+    result = cycle.run_once(
+        MarketSnapshot(
+            {"BTC": Decimal("60000")},
+            datetime(2026, 10, 4, tzinfo=timezone.utc),
+        ),
+        now=datetime(2026, 10, 4, 0, 1, tzinfo=timezone.utc),
+    )
+
+    assert result.verified is True
+    assert cycle.history == (result,)
