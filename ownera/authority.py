@@ -1,9 +1,4 @@
-"""Authority boundary for OWNERA financial execution.
-
-OWNERA owns financial intent and treasury state. Authority is deliberately
-behind a provider-neutral port so the production implementation can delegate
-to Verigate instead of reimplementing its authority protocol.
-"""
+"""Authority boundary for OWNERA financial execution."""
 
 from __future__ import annotations
 
@@ -11,21 +6,19 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from .authorization import AuthorizationIssuer, ExecutionAuthorization
-from .domain import Decision, PaymentIntent
+from .authorization import AuthorizationIssuer, ExecutionAuthorization, FinancialIntent
+from .domain import Decision
 from .firewall import AuthorizationDecision
 
 
 class AuthorityPort(Protocol):
-    """Minimum authority contract required by the financial execution layer."""
-
     @property
     def agent_id(self) -> str:
         ...
 
     def issue(
         self,
-        intent: PaymentIntent,
+        intent: FinancialIntent,
         verdict: AuthorizationDecision,
         *,
         policy_version: str,
@@ -36,7 +29,7 @@ class AuthorityPort(Protocol):
     def consume(
         self,
         authorization: ExecutionAuthorization,
-        intent: PaymentIntent,
+        intent: FinancialIntent,
         *,
         now: datetime | None = None,
     ) -> None:
@@ -45,8 +38,6 @@ class AuthorityPort(Protocol):
 
 @dataclass
 class LocalAuthorityAdapter:
-    """Sandbox adapter used until OWNERA is connected to Verigate."""
-
     issuer: AuthorizationIssuer
     agent_id: str = "ownera-sandbox"
 
@@ -60,7 +51,7 @@ class LocalAuthorityAdapter:
 
     def issue(
         self,
-        intent: PaymentIntent,
+        intent: FinancialIntent,
         verdict: AuthorizationDecision,
         *,
         policy_version: str,
@@ -76,7 +67,7 @@ class LocalAuthorityAdapter:
     def consume(
         self,
         authorization: ExecutionAuthorization,
-        intent: PaymentIntent,
+        intent: FinancialIntent,
         *,
         now: datetime | None = None,
     ) -> None:
@@ -84,5 +75,4 @@ class LocalAuthorityAdapter:
 
 
 def requires_execution_authority(verdict: AuthorizationDecision) -> bool:
-    """Only ALLOW can cross the execution authority boundary."""
     return verdict.decision == Decision.ALLOW

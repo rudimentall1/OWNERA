@@ -1,17 +1,23 @@
-"""Explicit authorization lifecycle for OWNERA financial actions.
-
-Authorization is a short-lived, immutable decision artifact. It is not a
-capability tier and it never grants access to the Sovereign Reserve.
-"""
+"""Explicit authorization lifecycle for OWNERA financial actions."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import Protocol
 from uuid import UUID, uuid4
 
-from .domain import Decision, PaymentIntent
+from .domain import Decision
+from .financial_action import FinancialAction
 from .firewall import AuthorizationDecision
+
+
+class FinancialIntent(Protocol):
+    id: UUID
+    idempotency_key: str
+
+    def to_financial_action(self, agent_id: str) -> FinancialAction:
+        ...
 
 
 class AuthorizationError(PermissionError):
@@ -46,7 +52,7 @@ class AuthorizationIssuer:
 
     def issue(
         self,
-        intent: PaymentIntent,
+        intent: FinancialIntent,
         verdict: AuthorizationDecision,
         *,
         policy_version: str,
@@ -71,7 +77,7 @@ class AuthorizationIssuer:
     def consume(
         self,
         authorization: ExecutionAuthorization,
-        intent: PaymentIntent,
+        intent: FinancialIntent,
         *,
         now: datetime | None = None,
     ) -> None:

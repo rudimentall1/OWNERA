@@ -1,14 +1,14 @@
-"""Deterministic investment decision primitives for the OWNERA sandbox.
+"""Deterministic investment decision primitives for the OWNERA sandbox."""
 
-This module deliberately contains no market-data client and no model integration.
-An agent may propose a trade, but OWNERA evaluates the proposal against explicit
-portfolio constraints before it can reach execution.
-"""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
+from uuid import UUID, uuid4
+
+from .domain import InvestmentIntent
+from .firewall import AuthorizationDecision
 
 
 class TradeSide(str, Enum):
@@ -76,6 +76,7 @@ class TradeProposal:
     price: Decimal
     currency: str
     rationale: str = ""
+    id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
         if not self.asset:
@@ -90,6 +91,18 @@ class TradeProposal:
     @property
     def notional(self) -> Decimal:
         return self.quantity * self.price
+
+    def to_intent(self) -> InvestmentIntent:
+        return InvestmentIntent(
+            asset=self.asset,
+            side=self.side.value,
+            quantity=self.quantity,
+            price=self.price,
+            currency=self.currency,
+            rationale=self.rationale,
+            id=self.id,
+            idempotency_key=f"investment:{self.id}",
+        )
 
 
 @dataclass(frozen=True)
@@ -117,11 +130,10 @@ class InvestmentPolicy:
 class InvestmentDecisionResult:
     decision: InvestmentDecision
     reason: str
+    correlation_id: UUID
 
 
 class InvestmentFirewall:
-    """Fail-closed evaluation of an agent-proposed portfolio trade."""
-
     def evaluate(
         self,
         portfolio: PortfolioSnapshot,
@@ -129,47 +141,51 @@ class InvestmentFirewall:
         policy: InvestmentPolicy,
         daily_turnover: Decimal = Decimal("0"),
     ) -> InvestmentDecisionResult:
+        correlation_id = uuid4()
         if proposal.currency != policy.currency or portfolio.currency != policy.currency:
-            return InvestmentDecisionResult(
-                InvestmentDecision.DENY, "currency_mismatch"
-            )
+            return InvestmentDecisionResult(InvestmentDecision.DENY, "currency_mismatch", correlation_id)
         if daily_turnover < 0:
-            return InvestmentDecisionResult(
-                InvestmentDecision.DENY, "invalid_daily_turnover"
-            )
+            return InvestmentDecisionResult(InvestmentDecision.DENY, "invalid_daily_turnover", correlation_id)
         if proposal.notional > policy.max_single_trade:
-            return InvestmentDecisionResult(
-                InvestmentDecision.DENY, "single_trade_limit"
-            )
+            return InvestmentDecisionResult(InvestmentDecision.DENY, "single_trade_limit", correlation_id)
         if daily_turnover + proposal.notional > policy.max_daily_turnover:
-            return InvestmentDecisionResult(
-                InvestmentDecision.DENY, "daily_turnover_limit"
-            )
+            return InvestmentDecisionResult(InvestmentDecision.DENY, "daily_turnover_limit", correlation_id)
 
         if proposal.side is TradeSide.BUY:
             if portfolio.cash - proposal.notional < policy.reserve_floor:
-                return InvestmentDecisionResult(
-                    InvestmentDecision.DENY, "reserve_floor"
-                )
+                return InvestmentDecisionResult(InvestmentDecision.DENY, "reserve_floor", correlation_id)
             projected_value = portfolio.position_value(proposal.asset) + proposal.notional
         else:
             held_value = portfolio.position_value(proposal.asset)
             if proposal.notional > held_value:
-                return InvestmentDecisionResult(
-                    InvestmentDecision.DENY, "insufficient_position"
-                )
+                return InvestmentDecisionResult(InvestmentDecision.DENY, "insufficient_position", correlation_id)
             projected_value = held_value - proposal.notional
 
         total_value = portfolio.total_value
         if total_value <= 0:
-            return InvestmentDecisionResult(
-                InvestmentDecision.DENY, "empty_portfolio"
-            )
+            return InvestmentDecisionResult(InvestmentDecision.DENY, "empty_portfolio", correlation_id)
 
         projected_percent = (projected_value / total_value) * Decimal("100")
         if projected_percent > policy.max_position_percent:
-            return InvestmentDecisionResult(
-                InvestmentDecision.DENY, "position_concentration"
-            )
+            return InvestmentDecisionResult(InvestmentDecision.DENY, "position_concentration", correlation_id)
 
-        return InvestmentDecisionResult(InvestmentDecision.ALLOW, "policy_satisfied")
+        return InvestmentDecisionResult(InvestmentDecision.ALLOW, "policy_satisfied", correlation_id)
+
+    @staticmethod
+    def authorization_decision(
+        proposal: TradeProposal,
+        result: InvestmentDecisionResult,
+    ) -> AuthorizationDecision:
+        from .domain import Decision
+
+        decision = {
+            InvestmentDecision.ALLOW: Decision.ALLOW,
+            InvestmentDecision.REVIEW: Decision.REVIEW,
+            InvestmentDecision.DENY: Decision.DENY,
+        }[result.decision]
+        return AuthorizationDecision(
+            intent_id=proposal.id,
+            decision=decision,
+            reasons=(result.reason,),
+            correlation_id=result.correlation_id,
+        )

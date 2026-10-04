@@ -43,7 +43,6 @@ class PaymentIntent:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_financial_action(self, agent_id: str) -> FinancialAction:
-        """Create the exact authority-bound representation of this intent."""
         if not agent_id.strip():
             raise ValueError("agent_id is required")
         if not self.idempotency_key:
@@ -56,6 +55,45 @@ class PaymentIntent:
             amount=self.amount.amount,
             currency=self.amount.currency,
             purpose=self.purpose,
+            idempotency_key=self.idempotency_key,
+        )
+
+
+@dataclass(frozen=True)
+class InvestmentIntent:
+    """An agent-proposed trade expressed as an authority-bound financial intent."""
+
+    asset: str
+    side: str
+    quantity: Decimal
+    price: Decimal
+    currency: str
+    rationale: str = ""
+    id: UUID = field(default_factory=uuid4)
+    idempotency_key: str = ""
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def notional(self) -> Decimal:
+        return self.quantity * self.price
+
+    def to_financial_action(self, agent_id: str) -> FinancialAction:
+        if not agent_id.strip():
+            raise ValueError("agent_id is required")
+        if not self.idempotency_key:
+            raise ValueError("idempotency key is required")
+        if self.quantity <= 0 or self.price <= 0:
+            raise ValueError("quantity and price must be positive")
+        if not self.asset.strip():
+            raise ValueError("asset is required")
+        return FinancialAction(
+            intent_id=self.id,
+            agent_id=agent_id,
+            action_type=f"investment.{self.side.lower()}",
+            destination=f"asset:{self.asset}",
+            amount=self.notional,
+            currency=self.currency,
+            purpose=self.rationale,
             idempotency_key=self.idempotency_key,
         )
 
