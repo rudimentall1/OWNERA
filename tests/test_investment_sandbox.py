@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import uuid4
 
 from ownera.domain import Decision
 from ownera.investment import InvestmentPolicy, PortfolioSnapshot, TradeProposal, TradeSide
@@ -19,7 +20,8 @@ def _sandbox() -> InvestmentSandbox:
 
 
 def test_autonomous_trade_crosses_authority_updates_portfolio_and_produces_evidence() -> None:
-    result = _sandbox().propose_trade(
+    sandbox = _sandbox()
+    result = sandbox.propose_trade(
         TradeProposal("BTC", TradeSide.BUY, Decimal("0.005"), Decimal("60000"), "USD")
     )
     assert result.decision is Decision.ALLOW
@@ -34,7 +36,7 @@ def test_autonomous_trade_crosses_authority_updates_portfolio_and_produces_evide
     assert result.financial_action.action_type == "investment.buy"
     assert result.portfolio_after.cash == Decimal("6700")
     assert result.portfolio_after.position_value("BTC") == Decimal("300")
-    assert result.evidence.evidence_sha256 == result.audit.all()[-1].payload_hash if result.audit.all() else False
+    assert sandbox.audit.all()[-1].payload_hash == result.evidence.evidence_sha256
 
 
 def test_denied_trade_never_changes_portfolio_or_gets_authority() -> None:

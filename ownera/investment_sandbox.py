@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from uuid import uuid4
 
 from .audit import AuditEvent, AuditLog
 from .authority import AuthorityPort, LocalAuthorityAdapter
@@ -102,7 +103,7 @@ class InvestmentSandbox:
             destination=f"asset:{proposal.asset}",
         )
         evidence = ExecutionEvidence.from_execution(
-            action, authorization, receipt, evidence_id=__import__("uuid").uuid4()
+            action, authorization, receipt, evidence_id=uuid4()
         )
         self._audit.append(
             AuditEvent(
