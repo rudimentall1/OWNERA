@@ -11,6 +11,7 @@ from .authority import AuthorityPort, LocalAuthorityAdapter
 from .authorization import AuthorizationError, ExecutionAuthorization
 from .domain import Decision
 from .evidence import ExecutionEvidence
+from .financial_action import FinancialAction
 from .investment import (
     InvestmentDecision,
     InvestmentFirewall,
@@ -19,7 +20,6 @@ from .investment import (
     Position,
     TradeProposal,
 )
-from .financial_action import FinancialAction
 from .receipt import ExecutionReceipt
 
 

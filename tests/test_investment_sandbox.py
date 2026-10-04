@@ -1,4 +1,5 @@
 from decimal import Decimal
+
 from ownera.domain import Decision
 from ownera.investment import InvestmentPolicy, PortfolioSnapshot, TradeProposal, TradeSide
 from ownera.investment_sandbox import InvestmentSandbox
