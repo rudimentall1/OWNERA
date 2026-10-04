@@ -94,5 +94,9 @@ def test_autonomous_cycle_can_rebalance_existing_position() -> None:
             datetime(2026, 10, 4, 0, 1, tzinfo=timezone.utc),
         )
     )
-    assert second.proposal_created is False
-    assert second.trade is None
+    assert second.proposal_created is True
+    assert second.trade is not None
+    assert second.trade.committed is True
+    assert second.trade.proposal.side.value == "SELL"
+    assert second.trade.proposal.notional == Decimal("15")
+    assert second.trade.evidence is not None
