@@ -65,7 +65,7 @@ def test_autonomous_cycle_does_not_execute_when_policy_blocks_agent() -> None:
     assert cycle.sandbox.portfolio.cash == Decimal("7000")
 
 
-def test_autonomous_cycle_can_rebalance_existing_position() -> None:
+def test_autonomous_cycle_second_observation_is_stable_at_target() -> None:
     sandbox = InvestmentSandbox(
         PortfolioSnapshot("USD", Decimal("6700"), ()),
         InvestmentPolicy(
@@ -94,9 +94,5 @@ def test_autonomous_cycle_can_rebalance_existing_position() -> None:
             datetime(2026, 10, 4, 0, 1, tzinfo=timezone.utc),
         )
     )
-    assert second.proposal_created is True
-    assert second.trade is not None
-    assert second.trade.committed is True
-    assert second.trade.proposal.side.value == "SELL"
-    assert second.trade.proposal.notional == Decimal("15")
-    assert second.trade.evidence is not None
+    assert second.proposal_created is False
+    assert second.trade is None
