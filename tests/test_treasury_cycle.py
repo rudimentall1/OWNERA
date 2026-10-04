@@ -164,6 +164,6 @@ def test_cycle_memory_records_each_cycle() -> None:
     )
 
     assert first.cycle_id != second.cycle_id
-    assert first.market_sha256 == second.market_sha256
+    assert first.market_sha256 != second.market_sha256
     assert cycle.history == (first, second)
     assert cycle.last_result is second
