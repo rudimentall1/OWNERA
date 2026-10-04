@@ -1,6 +1,4 @@
 from decimal import Decimal
-from uuid import uuid4
-
 from ownera.domain import Decision
 from ownera.investment import InvestmentPolicy, PortfolioSnapshot, TradeProposal, TradeSide
 from ownera.investment_sandbox import InvestmentSandbox
