@@ -2,24 +2,38 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from uuid import UUID, uuid4
 
 from .agent import AutonomousInvestmentAgent, MarketSnapshot
+from .domain import Decision
 from .investment_sandbox import InvestmentSandbox, SimulatedTrade
 
 
 @dataclass(frozen=True)
 class TreasuryCycleResult:
+    cycle_id: UUID
     proposal_created: bool
     trade: SimulatedTrade | None
     observed_at: datetime
+    market_sha256: str
+    decision: Decision | None = None
+    rationale: str | None = None
+    evidence_sha256: str | None = None
     market_accepted: bool = True
     rejection_reason: str | None = None
 
     @property
     def verified(self) -> bool:
-        return self.trade is not None and self.trade.committed and self.trade.evidence is not None and self.trade.evidence.verify_integrity()
+        return (
+            self.trade is not None
+            and self.trade.committed
+            and self.trade.evidence is not None
+            and self.trade.evidence.verify_integrity()
+        )
 
 
 class AutonomousTreasuryCycle:
@@ -62,21 +76,30 @@ class AutonomousTreasuryCycle:
             raise ValueError("now must be timezone-aware")
         if market.observed_at.tzinfo is None:
             raise ValueError("market.observed_at must be timezone-aware")
+
+        cycle_id = uuid4()
+        market_sha256 = self._market_digest(market)
+
         if market.observed_at > current_time:
             result = TreasuryCycleResult(
+                cycle_id,
                 False,
                 None,
                 market.observed_at,
+                market_sha256,
                 market_accepted=False,
                 rejection_reason="market_timestamp_in_future",
             )
             self._remember(result)
             return result
+
         if current_time - market.observed_at > self._max_market_age:
             result = TreasuryCycleResult(
+                cycle_id,
                 False,
                 None,
                 market.observed_at,
+                market_sha256,
                 market_accepted=False,
                 rejection_reason="market_data_stale",
             )
@@ -85,14 +108,45 @@ class AutonomousTreasuryCycle:
 
         proposal = self._agent.propose(self._sandbox.portfolio, market)
         if proposal is None:
-            result = TreasuryCycleResult(False, None, market.observed_at)
+            result = TreasuryCycleResult(
+                cycle_id,
+                False,
+                None,
+                market.observed_at,
+                market_sha256,
+                decision=Decision.ALLOW,
+                rationale="portfolio already satisfies the configured allocation target",
+            )
             self._remember(result)
             return result
 
         trade = self._sandbox.propose_trade(proposal)
-        result = TreasuryCycleResult(True, trade, market.observed_at)
+        result = TreasuryCycleResult(
+            cycle_id,
+            True,
+            trade,
+            market.observed_at,
+            market_sha256,
+            decision=trade.decision,
+            rationale=proposal.rationale,
+            evidence_sha256=trade.evidence.evidence_sha256 if trade.evidence else None,
+        )
         self._remember(result)
         return result
+
+    @staticmethod
+    def _market_digest(market: MarketSnapshot) -> str:
+        payload = {
+            "observed_at": market.observed_at.isoformat(),
+            "prices": {
+                asset: format(price, "f")
+                for asset, price in sorted(market.prices.items())
+            },
+        }
+        encoded = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
 
     def _remember(self, result: TreasuryCycleResult) -> None:
         self._history.append(result)
