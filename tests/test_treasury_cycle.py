@@ -95,7 +95,8 @@ def test_autonomous_cycle_second_observation_is_stable_at_target() -> None:
         MarketSnapshot(
             {"BTC": Decimal("60000")},
             datetime(2026, 10, 4, 0, 1, tzinfo=timezone.utc),
-        )
+        ),
+        now=datetime(2026, 10, 4, 0, 2, tzinfo=timezone.utc),
     )
     assert second.proposal_created is False
     assert second.trade is None
