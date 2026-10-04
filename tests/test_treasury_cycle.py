@@ -29,7 +29,8 @@ def test_autonomous_cycle_proposes_and_executes_under_authority() -> None:
         MarketSnapshot(
             {"BTC": Decimal("60000")},
             datetime(2026, 10, 4, tzinfo=timezone.utc),
-        )
+        ),
+        now=datetime(2026, 10, 4, 0, 1, tzinfo=timezone.utc),
     )
 
     assert result.proposal_created is True
@@ -55,7 +56,8 @@ def test_autonomous_cycle_does_not_execute_when_policy_blocks_agent() -> None:
         MarketSnapshot(
             {"BTC": Decimal("60000")},
             datetime(2026, 10, 4, tzinfo=timezone.utc),
-        )
+        ),
+        now=datetime(2026, 10, 4, 0, 1, tzinfo=timezone.utc),
     )
 
     assert result.proposal_created is True
@@ -83,7 +85,8 @@ def test_autonomous_cycle_second_observation_is_stable_at_target() -> None:
         MarketSnapshot(
             {"BTC": Decimal("60000")},
             datetime(2026, 10, 4, tzinfo=timezone.utc),
-        )
+        ),
+        now=datetime(2026, 10, 4, 0, 1, tzinfo=timezone.utc),
     )
     assert first.trade is not None
     assert first.trade.committed is True
