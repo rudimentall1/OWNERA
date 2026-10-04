@@ -43,6 +43,12 @@ def test_autonomous_cycle_proposes_and_executes_under_authority() -> None:
     assert result.rationale is not None
     assert result.market_sha256
     assert result.evidence_sha256 == result.trade.evidence.evidence_sha256
+    assert result.outcome is not None
+    assert result.outcome.status == "EXECUTED"
+    assert result.outcome.intent_id == result.trade.proposal.id
+    assert result.outcome.authorization_id == result.trade.authorization.id
+    assert result.outcome.evidence_sha256 == result.trade.evidence.evidence_sha256
+    assert result.outcome.integrity_verified is True
     assert cycle.sandbox.portfolio.cash == Decimal("6650")
 
 
@@ -70,6 +76,11 @@ def test_autonomous_cycle_does_not_execute_when_policy_blocks_agent() -> None:
     assert result.trade.committed is False
     assert result.decision is Decision.DENY
     assert result.evidence_sha256 is None
+    assert result.outcome is not None
+    assert result.outcome.status == "REJECTED"
+    assert result.outcome.intent_id is None
+    assert result.outcome.authorization_id is None
+    assert result.outcome.integrity_verified is False
     assert cycle.sandbox.portfolio.cash == Decimal("7000")
 
 
@@ -126,6 +137,10 @@ def test_cycle_rejects_stale_market_before_proposal() -> None:
     assert result.trade is None
     assert result.decision is None
     assert result.market_sha256
+    assert result.outcome is not None
+    assert result.outcome.status == "NO_ACTION"
+    assert result.outcome.decision is Decision.DENY
+    assert result.outcome.source == "market-validation"
     assert cycle.sandbox.portfolio.cash == Decimal("7000")
     assert cycle.last_result is result
 
@@ -143,7 +158,11 @@ def test_cycle_rejects_future_market_before_proposal() -> None:
     assert result.market_accepted is False
     assert result.rejection_reason == "market_timestamp_in_future"
     assert result.proposal_created is False
+    assert result.trade is None
     assert result.decision is None
+    assert result.outcome is not None
+    assert result.outcome.status == "NO_ACTION"
+    assert result.outcome.decision is Decision.DENY
 
 
 def test_cycle_memory_records_each_cycle() -> None:
@@ -165,5 +184,9 @@ def test_cycle_memory_records_each_cycle() -> None:
 
     assert first.cycle_id != second.cycle_id
     assert first.market_sha256 != second.market_sha256
+    assert first.outcome is not None
+    assert second.outcome is not None
+    assert first.outcome.cycle_id == first.cycle_id
+    assert second.outcome.cycle_id == second.cycle_id
     assert cycle.history == (first, second)
     assert cycle.last_result is second

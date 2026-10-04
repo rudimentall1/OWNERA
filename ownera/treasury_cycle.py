@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 from .agent import AutonomousInvestmentAgent, MarketSnapshot
 from .domain import Decision
 from .investment_sandbox import InvestmentSandbox, SimulatedTrade
+from .outcome import TreasuryOutcome
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class TreasuryCycleResult:
     evidence_sha256: str | None = None
     market_accepted: bool = True
     rejection_reason: str | None = None
+    outcome: TreasuryOutcome | None = None
 
     @property
     def verified(self) -> bool:
@@ -89,6 +91,12 @@ class AutonomousTreasuryCycle:
                 market_sha256,
                 market_accepted=False,
                 rejection_reason="market_timestamp_in_future",
+                outcome=TreasuryOutcome.no_action(
+                    cycle_id,
+                    decision=Decision.DENY,
+                    observed_at=current_time,
+                    source="market-validation",
+                ),
             )
             self._remember(result)
             return result
@@ -102,6 +110,12 @@ class AutonomousTreasuryCycle:
                 market_sha256,
                 market_accepted=False,
                 rejection_reason="market_data_stale",
+                outcome=TreasuryOutcome.no_action(
+                    cycle_id,
+                    decision=Decision.DENY,
+                    observed_at=current_time,
+                    source="market-validation",
+                ),
             )
             self._remember(result)
             return result
@@ -116,6 +130,12 @@ class AutonomousTreasuryCycle:
                 market_sha256,
                 decision=Decision.ALLOW,
                 rationale="portfolio already satisfies the configured allocation target",
+                outcome=TreasuryOutcome.no_action(
+                    cycle_id,
+                    decision=Decision.ALLOW,
+                    observed_at=current_time,
+                    source="decision-engine",
+                ),
             )
             self._remember(result)
             return result
@@ -130,6 +150,11 @@ class AutonomousTreasuryCycle:
             decision=trade.decision,
             rationale=proposal.rationale,
             evidence_sha256=trade.evidence.evidence_sha256 if trade.evidence else None,
+            outcome=TreasuryOutcome.from_trade(
+                cycle_id,
+                trade,
+                observed_at=current_time,
+            ),
         )
         self._remember(result)
         return result
