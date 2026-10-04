@@ -44,7 +44,13 @@ def test_buy_cannot_break_reserve_floor() -> None:
     result = InvestmentFirewall().evaluate(
         portfolio(),
         TradeProposal("ETH", TradeSide.BUY, Decimal("0.02"), Decimal("30000"), "USD"),
-        policy(),
+        InvestmentPolicy(
+            max_single_trade=Decimal("5000"),
+            reserve_floor=Decimal("3000"),
+            max_position_percent=Decimal("40"),
+            max_daily_turnover=Decimal("5000"),
+            currency="USD",
+        ),
     )
 
     assert result.decision is InvestmentDecision.DENY
@@ -83,7 +89,13 @@ def test_sell_cannot_exceed_held_position() -> None:
     result = InvestmentFirewall().evaluate(
         portfolio(),
         TradeProposal("BTC", TradeSide.SELL, Decimal("0.1"), Decimal("60000"), "USD"),
-        policy(),
+        InvestmentPolicy(
+            max_single_trade=Decimal("10000"),
+            reserve_floor=Decimal("3000"),
+            max_position_percent=Decimal("40"),
+            max_daily_turnover=Decimal("10000"),
+            currency="USD",
+        ),
     )
 
     assert result.decision is InvestmentDecision.DENY
