@@ -5,9 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from .audit import AuditEvent, AuditLog
 from .authority import AuthorityPort, LocalAuthorityAdapter
 from .authorization import AuthorizationError, ExecutionAuthorization
 from .domain import Decision
+from .evidence import ExecutionEvidence
 from .investment import (
     InvestmentDecision,
     InvestmentFirewall,
@@ -17,6 +19,7 @@ from .investment import (
     TradeProposal,
 )
 from .financial_action import FinancialAction
+from .receipt import ExecutionReceipt
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,8 @@ class SimulatedTrade:
     portfolio_after: PortfolioSnapshot
     authorization: ExecutionAuthorization | None = None
     financial_action: FinancialAction | None = None
+    receipt: ExecutionReceipt | None = None
+    evidence: ExecutionEvidence | None = None
 
 
 class InvestmentSandbox:
@@ -36,53 +41,88 @@ class InvestmentSandbox:
         portfolio: PortfolioSnapshot,
         policy: InvestmentPolicy,
         authority: AuthorityPort | None = None,
+        audit: AuditLog | None = None,
     ) -> None:
         self.portfolio = portfolio
         self.policy = policy
         self._authority = authority or LocalAuthorityAdapter.create()
+        self._audit = audit or AuditLog()
         self.daily_turnover = Decimal("0")
+
+    @property
+    def audit(self) -> AuditLog:
+        return self._audit
 
     def propose_trade(self, proposal: TradeProposal) -> SimulatedTrade:
         before = self.portfolio
         result = InvestmentFirewall().evaluate(
-            before,
-            proposal,
-            self.policy,
-            daily_turnover=self.daily_turnover,
+            before, proposal, self.policy, daily_turnover=self.daily_turnover
         )
         verdict = InvestmentFirewall.authorization_decision(proposal, result)
         if result.decision is not InvestmentDecision.ALLOW:
+            self._audit.append(
+                AuditEvent(
+                    event_type="investment.rejected",
+                    actor="investment-firewall",
+                    correlation_id=result.correlation_id,
+                    payload_hash=f"proposal:{proposal.id}",
+                    policy_version="investment-v1",
+                )
+            )
             return SimulatedTrade(proposal, verdict.decision, False, before, before)
 
         intent = proposal.to_intent()
         authorization = self._authority.issue(
-            intent,
-            verdict,
-            policy_version="investment-v1",
+            intent, verdict, policy_version="investment-v1"
         )
         try:
             self._authority.consume(authorization, intent)
         except AuthorizationError:
+            self._audit.append(
+                AuditEvent(
+                    event_type="investment.rejected",
+                    actor="authority",
+                    correlation_id=authorization.correlation_id,
+                    payload_hash=f"proposal:{proposal.id}",
+                    policy_version="investment-v1",
+                )
+            )
             return SimulatedTrade(
-                proposal,
-                Decision.DENY,
-                False,
-                before,
-                before,
-                authorization=authorization,
+                proposal, Decision.DENY, False, before, before, authorization=authorization
             )
 
-        self.portfolio = self._apply(proposal)
+        after = self._apply(proposal)
+        self.portfolio = after
         self.daily_turnover += proposal.notional
         action = intent.to_financial_action(self._authority.agent_id)
+        receipt = ExecutionReceipt.committed(
+            authorization,
+            amount=proposal.notional,
+            currency=proposal.currency,
+            destination=f"asset:{proposal.asset}",
+        )
+        evidence = ExecutionEvidence.from_execution(
+            action, authorization, receipt, evidence_id=__import__("uuid").uuid4()
+        )
+        self._audit.append(
+            AuditEvent(
+                event_type="investment.committed",
+                actor="investment-sandbox",
+                correlation_id=authorization.correlation_id,
+                payload_hash=evidence.evidence_sha256,
+                policy_version=authorization.policy_version,
+            )
+        )
         return SimulatedTrade(
             proposal,
             Decision.ALLOW,
             True,
             before,
-            self.portfolio,
+            after,
             authorization=authorization,
             financial_action=action,
+            receipt=receipt,
+            evidence=evidence,
         )
 
     def _apply(self, proposal: TradeProposal) -> PortfolioSnapshot:
@@ -100,9 +140,9 @@ class InvestmentSandbox:
             else:
                 position = positions[existing]
                 positions[existing] = Position(
-                    asset=position.asset,
-                    quantity=position.quantity + proposal.quantity,
-                    price=proposal.price,
+                    position.asset,
+                    position.quantity + proposal.quantity,
+                    proposal.price,
                 )
         else:
             cash += proposal.notional

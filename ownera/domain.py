@@ -95,6 +95,12 @@ class InvestmentIntent:
             currency=self.currency,
             purpose=self.rationale,
             idempotency_key=self.idempotency_key,
+            metadata={
+                "asset": self.asset,
+                "side": self.side.upper(),
+                "quantity_exact": format(self.quantity, "f"),
+                "price_exact": format(self.price, "f"),
+            },
         )
 
 

@@ -1,16 +1,10 @@
-"""Canonical financial action envelope for authority integrations.
-
-The treasury keeps monetary values as exact decimal strings at the authority
-boundary. External authority providers must bind the exact amount, currency,
-destination, and intent identity; binary floating-point conversion is never
-performed here.
-"""
+"""Canonical financial action envelope for authority integrations."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from uuid import UUID
 
@@ -25,9 +19,10 @@ class FinancialAction:
     currency: str
     purpose: str
     idempotency_key: str
+    metadata: dict[str, str] = field(default_factory=dict)
 
-    def canonical_payload(self) -> dict[str, str]:
-        return {
+    def canonical_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {
             "intent_id": str(self.intent_id),
             "agent_id": self.agent_id,
             "action_type": self.action_type,
@@ -37,6 +32,9 @@ class FinancialAction:
             "purpose": self.purpose,
             "idempotency_key": self.idempotency_key,
         }
+        if self.metadata:
+            payload["metadata"] = dict(sorted(self.metadata.items()))
+        return payload
 
     def digest(self) -> str:
         payload = json.dumps(
