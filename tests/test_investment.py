@@ -43,7 +43,7 @@ def test_buy_is_allowed_when_all_constraints_hold() -> None:
 def test_buy_cannot_break_reserve_floor() -> None:
     result = InvestmentFirewall().evaluate(
         portfolio(),
-        TradeProposal("ETH", TradeSide.BUY, Decimal("0.02"), Decimal("30000"), "USD"),
+        TradeProposal("ETH", TradeSide.BUY, Decimal("0.15"), Decimal("30000"), "USD"),
         InvestmentPolicy(
             max_single_trade=Decimal("5000"),
             reserve_floor=Decimal("3000"),
