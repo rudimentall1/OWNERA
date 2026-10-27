@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import threading
 import time
@@ -58,6 +59,22 @@ class SubprocessStrategyProvider:
         self.max_output_bytes = max_output_bytes
 
     @staticmethod
+    def _kill_process_tree(process: subprocess.Popen[bytes]) -> None:
+        """Stop the provider and its descendants where process groups are available."""
+        if process.poll() is not None:
+            return
+        if os.name == "posix":
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        else:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+    @staticmethod
     def _payload(portfolio: PortfolioSnapshot, market: MarketSnapshot) -> dict[str, Any]:
         return {
             "protocol_version": 1,
@@ -104,6 +121,7 @@ class SubprocessStrategyProvider:
                 cwd=self.working_directory,
                 env=env,
                 shell=False,
+                start_new_session=(os.name == "posix"),
             )
         except OSError as exc:
             raise ExternalProviderError("strategy provider could not be started") from exc
@@ -128,10 +146,7 @@ class SubprocessStrategyProvider:
                             destination.extend(chunk[:remaining])
                         if output_size > self.max_output_bytes:
                             output_exceeded.set()
-                            try:
-                                process.kill()
-                            except OSError:
-                                pass
+                            self._kill_process_tree(process)
                             return
             finally:
                 stream.close()
@@ -162,14 +177,14 @@ class SubprocessStrategyProvider:
                 if output_exceeded.is_set():
                     break
                 if time.monotonic() >= deadline:
-                    process.kill()
+                    self._kill_process_tree(process)
                     process.wait()
                     raise ExternalProviderError("strategy provider timed out")
                 time.sleep(0.005)
             process.wait()
         finally:
             if process.poll() is None:
-                process.kill()
+                self._kill_process_tree(process)
                 process.wait()
             writer.join(timeout=0.2)
             for thread in readers:
