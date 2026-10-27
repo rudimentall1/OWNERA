@@ -26,3 +26,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 ignore = ["FURB157", "UP017"]
+
+[tool.setuptools.packages.find]
+include = ["ownera*"]
