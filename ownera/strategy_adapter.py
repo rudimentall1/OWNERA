@@ -11,8 +11,8 @@ from collections.abc import Callable, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Protocol
 
-from .investment import PortfolioSnapshot, TradeProposal, TradeSide
 from .agent import MarketSnapshot
+from .investment import PortfolioSnapshot, TradeProposal, TradeSide
 
 
 class StrategyAdapterError(ValueError):
@@ -30,7 +30,7 @@ class ProposalSource(Protocol):
 
 
 def _exact_decimal(value: object, field: str) -> Decimal:
-    if isinstance(value, bool) or isinstance(value, float):
+    if isinstance(value, (bool, float)):
         raise StrategyAdapterError(f"{field} must not be a float or boolean")
     if not isinstance(value, (str, int, Decimal)):
         raise StrategyAdapterError(f"{field} must be a decimal string, integer, or Decimal")
