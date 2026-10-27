@@ -66,8 +66,14 @@ def test_subprocess_provider_rejects_nonzero_exit():
         _provider("import sys; sys.exit(3)").propose(_portfolio(), _market())
 
 
-def test_subprocess_provider_rejects_oversized_output():
-    provider = _provider("print('x' * 100)", max_output_bytes=10)
+def test_subprocess_provider_caps_stdout_while_reading():
+    provider = _provider("import sys; sys.stdout.write('x' * 1000000)", max_output_bytes=1024)
+    with pytest.raises(ExternalProviderError, match="size limit"):
+        provider.propose(_portfolio(), _market())
+
+
+def test_subprocess_provider_caps_stderr_while_reading():
+    provider = _provider("import sys; sys.stderr.write('x' * 1000000)", max_output_bytes=1024)
     with pytest.raises(ExternalProviderError, match="size limit"):
         provider.propose(_portfolio(), _market())
 

@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
+import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -27,7 +29,8 @@ class SubprocessStrategyProvider:
 
     The provider receives only a normalized portfolio and market snapshot over
     stdin. Its stdout must contain exactly one JSON object or JSON null.
-    Environment variables are explicitly allowlisted by the caller.
+    Environment variables are explicitly allowlisted by the caller. Both output
+    streams are byte-capped while being read, not after buffering in memory.
     """
 
     def __init__(
@@ -85,7 +88,7 @@ class SubprocessStrategyProvider:
             self._payload(portfolio, market),
             sort_keys=True,
             separators=(",", ":"),
-        )
+        ).encode("utf-8")
         env = {
             "PATH": os.defpath,
             "PYTHONNOUSERSITE": "1",
@@ -93,33 +96,96 @@ class SubprocessStrategyProvider:
             **self.environment,
         }
         try:
-            completed = subprocess.run(
+            process = subprocess.Popen(
                 self.command,
-                input=request,
-                text=True,
-                capture_output=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 cwd=self.working_directory,
                 env=env,
-                timeout=self.timeout_seconds,
-                check=False,
                 shell=False,
             )
-        except subprocess.TimeoutExpired as exc:
-            raise ExternalProviderError("strategy provider timed out") from exc
         except OSError as exc:
             raise ExternalProviderError("strategy provider could not be started") from exc
 
-        if len(completed.stdout.encode("utf-8")) > self.max_output_bytes:
+        stdout = bytearray()
+        stderr = bytearray()
+        output_lock = threading.Lock()
+        output_size = 0
+        output_exceeded = threading.Event()
+
+        def drain(stream: Any, destination: bytearray) -> None:
+            nonlocal output_size
+            try:
+                while True:
+                    chunk = stream.read(4096)
+                    if not chunk:
+                        return
+                    with output_lock:
+                        remaining = self.max_output_bytes - output_size
+                        output_size += len(chunk)
+                        if remaining > 0:
+                            destination.extend(chunk[:remaining])
+                        if output_size > self.max_output_bytes:
+                            output_exceeded.set()
+                            try:
+                                process.kill()
+                            except OSError:
+                                pass
+                            return
+            finally:
+                stream.close()
+
+        def send_input() -> None:
+            assert process.stdin is not None
+            try:
+                process.stdin.write(request)
+                process.stdin.flush()
+            except (BrokenPipeError, OSError):
+                pass
+            finally:
+                process.stdin.close()
+
+        assert process.stdout is not None and process.stderr is not None
+        readers = [
+            threading.Thread(target=drain, args=(process.stdout, stdout), daemon=True),
+            threading.Thread(target=drain, args=(process.stderr, stderr), daemon=True),
+        ]
+        writer = threading.Thread(target=send_input, daemon=True)
+        for thread in readers:
+            thread.start()
+        writer.start()
+
+        deadline = time.monotonic() + self.timeout_seconds
+        try:
+            while process.poll() is None:
+                if output_exceeded.is_set():
+                    break
+                if time.monotonic() >= deadline:
+                    process.kill()
+                    process.wait()
+                    raise ExternalProviderError("strategy provider timed out")
+                time.sleep(0.005)
+            process.wait()
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            writer.join(timeout=0.2)
+            for thread in readers:
+                thread.join(timeout=0.2)
+
+        if output_exceeded.is_set():
             raise ExternalProviderError("strategy provider output exceeded size limit")
-        if completed.returncode != 0:
-            detail = completed.stderr.strip()[:500]
+        if process.returncode != 0:
+            detail = stderr.decode("utf-8", errors="replace").strip()[:500]
             raise ExternalProviderError(
-                f"strategy provider exited with status {completed.returncode}"
+                f"strategy provider exited with status {process.returncode}"
                 + (f": {detail}" if detail else "")
             )
         try:
-            result = json.loads(completed.stdout)
-        except json.JSONDecodeError as exc:
+            result = json.loads(stdout.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ExternalProviderError("strategy provider stdout must contain one JSON value") from exc
         if result is None:
             return None
