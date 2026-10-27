@@ -11,12 +11,11 @@ import json
 import os
 import subprocess
 from collections.abc import Mapping, Sequence
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from .agent import MarketSnapshot
-from .investment import PortfolioSnapshot, Position
+from .investment import PortfolioSnapshot
 
 
 class ExternalProviderError(RuntimeError):
@@ -98,8 +97,7 @@ class SubprocessStrategyProvider:
                 self.command,
                 input=request,
                 text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 cwd=self.working_directory,
                 env=env,
                 timeout=self.timeout_seconds,
