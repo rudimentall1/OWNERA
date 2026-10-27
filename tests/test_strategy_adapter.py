@@ -1,10 +1,14 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
 
 from ownera.agent import MarketSnapshot
-from ownera.investment import PortfolioSnapshot, TradeSide
+from ownera.domain import Decision
+from ownera.investment import InvestmentPolicy, PortfolioSnapshot, TradeSide
+from ownera.investment_sandbox import InvestmentSandbox
 from ownera.strategy_adapter import StrategyAdapterError, ValidatedStrategyAdapter
+from ownera.treasury_cycle import AutonomousTreasuryCycle
 
 
 class FakeProvider:
@@ -29,8 +33,6 @@ def _portfolio():
 
 
 def _market():
-    from datetime import datetime, timezone
-
     return MarketSnapshot(
         {"BTC": Decimal("60000"), "ETH": Decimal("3000")},
         datetime(2026, 10, 27, tzinfo=timezone.utc),
@@ -103,3 +105,36 @@ def test_adapter_rejects_price_for_asset_not_in_market():
 
     with pytest.raises(StrategyAdapterError, match="price does not match"):
         _adapter(payload).propose(_portfolio(), _market())
+
+
+
+def test_external_strategy_flows_through_treasury_authority_and_evidence():
+    adapter = _adapter(_payload())
+    sandbox = InvestmentSandbox(
+        _portfolio(),
+        InvestmentPolicy(
+            max_single_trade=Decimal("500"),
+            reserve_floor=Decimal("3000"),
+            max_position_percent=Decimal("40"),
+            max_daily_turnover=Decimal("1000"),
+            currency="USD",
+        ),
+    )
+    cycle = AutonomousTreasuryCycle(adapter, sandbox)
+
+    result = cycle.run_once(
+        _market(),
+        now=datetime(2026, 10, 27, 0, 1, tzinfo=timezone.utc),
+    )
+
+    assert result.proposal_created is True
+    assert result.trade is not None
+    assert result.trade.decision is Decision.ALLOW
+    assert result.trade.committed is True
+    assert result.trade.evidence is not None
+    assert result.trade.evidence.verify_integrity()
+    assert result.outcome is not None
+    assert result.outcome.status == "EXECUTED"
+    assert result.outcome.intent_id == result.trade.proposal.id
+    assert result.outcome.authorization_id == result.trade.authorization.id
+    assert sandbox.portfolio.cash == Decimal("9940.000")

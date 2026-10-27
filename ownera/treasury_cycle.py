@@ -6,12 +6,24 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import Protocol
 from uuid import UUID, uuid4
 
-from .agent import AutonomousInvestmentAgent, MarketSnapshot
+from .agent import MarketSnapshot
 from .domain import Decision
+from .investment import PortfolioSnapshot, TradeProposal
 from .investment_sandbox import InvestmentSandbox, SimulatedTrade
 from .outcome import TreasuryOutcome
+
+
+class StrategyProvider(Protocol):
+    """Proposal-only interface for built-in or external strategy providers."""
+
+    def propose(
+        self,
+        portfolio: PortfolioSnapshot,
+        market: MarketSnapshot,
+    ) -> TradeProposal | None: ...
 
 
 @dataclass(frozen=True)
@@ -43,7 +55,7 @@ class AutonomousTreasuryCycle:
 
     def __init__(
         self,
-        agent: AutonomousInvestmentAgent,
+        agent: StrategyProvider,
         sandbox: InvestmentSandbox,
         *,
         max_market_age: timedelta = timedelta(minutes=5),
