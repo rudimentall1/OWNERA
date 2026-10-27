@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-10-27",
+  "purpose": "Reproducible research pins only. These are not approved deployment artifacts.",
+  "policy": {
+    "fork_by_default": false,
+    "live_trading_enabled": false,
+    "third_party_code_may_receive_credentials": false,
+    "all_providers_are_untrusted": true,
+    "required_before_deployment": [
+      "review exact commit license and all bundled dependency/model/data terms",
+      "review installation scripts and dependency lifecycle hooks",
+      "build a pinned image and record its digest",
+      "run as a dedicated unprivileged identity with network egress restrictions",
+      "prove proposal-only output and deny direct execution paths",
+      "run reproducible out-of-sample evaluation including fees, slippage, turnover and drawdown"
+    ]
+  },
+  "candidates": [
+    {
+      "id": "finrobot",
+      "repository": "https://github.com/AI4Finance-Foundation/FinRobot",
+      "research_commit": "63e1884a42ea7b729551a5424b4bd6a65af636e0",
+      "upstream_head_observed_at": "2026-10-27",
+      "license_signal": "Apache-2.0; verify exact commit and all assets/dependencies",
+      "intended_role": "research and structured financial analysis",
+      "execution_capable": false,
+      "status": "candidate-not-installed"
+    },
+    {
+      "id": "tradingagents",
+      "repository": "https://github.com/TauricResearch/TradingAgents",
+      "research_commit": "e8f5503e9b86d5c2710b0c76b1f686703968c9df",
+      "upstream_head_observed_at": "2026-10-27",
+      "license_signal": "Apache-2.0; verify exact commit and all assets/dependencies",
+      "intended_role": "multi-agent research and decision workflow benchmark",
+      "execution_capable": false,
+      "status": "candidate-not-installed"
+    },
+    {
+      "id": "hummingbot",
+      "repository": "https://github.com/hummingbot/hummingbot",
+      "research_commit": "9af100d6822da7d2d0291a906c730ef172284ee2",
+      "upstream_head_observed_at": "2026-10-27",
+      "license_signal": "Apache-2.0; verify exact commit and all assets/dependencies",
+      "intended_role": "isolated trading engine evaluation",
+      "execution_capable": true,
+      "status": "candidate-not-installed"
+    },
+    {
+      "id": "ccxt",
+      "repository": "https://github.com/ccxt/ccxt",
+      "research_commit": "133fd945e5dabea9b08a3d6b1012cefe1ef9713b",
+      "upstream_head_observed_at": "2026-10-27",
+      "license_signal": "MIT; verify exact commit and package/dependency terms",
+      "intended_role": "market-data and exchange API connector behind a restricted adapter",
+      "execution_capable": true,
+      "status": "candidate-not-installed"
+    },
+    {
+      "id": "freqtrade",
+      "repository": "https://github.com/freqtrade/freqtrade",
+      "research_commit": "dafa0b6f4e1af30a80aedf730b5509ca59d0d7cc",
+      "upstream_head_observed_at": "2026-10-27",
+      "license_signal": "GPL-3.0; legal review required before distribution/combination",
+      "intended_role": "isolated backtesting and strategy evaluation",
+      "execution_capable": true,
+      "status": "candidate-not-installed"
+    }
+  ]
+}
