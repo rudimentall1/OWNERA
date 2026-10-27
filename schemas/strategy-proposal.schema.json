@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ownera.dev/schemas/strategy-proposal.schema.json",
+  "title": "OWNERA External Strategy Proposal",
+  "description": "Untrusted proposal-only output. This schema does not authorize execution.",
+  "type": "object",
+  "required": ["asset", "side", "quantity", "price", "currency"],
+  "additionalProperties": false,
+  "properties": {
+    "asset": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "side": {
+      "type": "string",
+      "enum": ["BUY", "SELL"]
+    },
+    "quantity": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+      "description": "Exact decimal string. JSON numbers/floats are deliberately forbidden."
+    },
+    "price": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+      "description": "Exact decimal string. OWNERA must compare it with its accepted market snapshot."
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 12,
+      "pattern": "^[A-Z0-9._-]+$"
+    },
+    "rationale": {
+      "type": "string",
+      "maxLength": 500
+    }
+  }
+}

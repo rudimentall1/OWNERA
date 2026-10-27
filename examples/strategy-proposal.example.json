@@ -1,0 +1,8 @@
+{
+  "asset": "BTC",
+  "side": "BUY",
+  "quantity": "0.001",
+  "price": "60000.00",
+  "currency": "USD",
+  "rationale": "Research-only proposal from a pinned strategy provider"
+}
