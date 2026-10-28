@@ -101,6 +101,25 @@ Required mitigation:
 
 These controls reduce specific risks; they do not make arbitrary external agent executables trusted or turn the approval UI into an OWNERA financial authorization system.
 
+### OD-06 — ACP readiness probes execute the configured command outside the turn sandbox
+
+**Risk: Medium operational boundary gap; not an authorization bypass by itself.**
+
+Evidence at the pinned commit:
+- `AcpAdapter.probe()` calls `StdioRpc.spawn(argv, cwd=str(Path.home()), max_bytes=...)` to perform an ACP `initialize` handshake.
+- `StdioRpc.spawn()` only invokes `turn_sandbox.self_check()` and wraps the command when `sandbox=True`; the probe call does not set that flag.
+- The probe still receives `child_env()`, so it inherits the same allow-listed ambient provider variables discussed in OD-05.
+- The probe is invoked by the engine registry when status is requested; documentation says probes occur on request, are time-bounded, and kill a process group that does not answer.
+
+Impact:
+Enabling the turn sandbox does not mean every launch of a configured ACP executable is sandboxed. A readiness check can execute the configured binary with the server user's filesystem and network permissions before a conversation turn begins. This matters if an operator treats the sandbox toggle as applying to all engine execution. It is not, by itself, a privilege escalation: configuring a command already delegates execution of that command to the service.
+
+Required mitigation:
+1. Make the UI and docs explicit that the turn sandbox does not cover readiness probes.
+2. Prefer a non-executing cached status for custom ACP commands where possible, or run the handshake in the same fail-closed sandbox with only the mounts and environment it needs.
+3. Add a regression test that enables the sandbox, invokes the probe path, and verifies no child is started outside the sandbox; also test failure behavior when bubblewrap is unavailable.
+4. Keep custom ACP commands restricted to trusted, operator-selected executables.
+
 ## Evidence and limitations
 
 - Source references are pinned to `9b67118d9f18de70fbce394093c9c95aeb79045e`.
