@@ -72,6 +72,25 @@ An agent process operating in the granted profile may affect or access the crede
 Required mitigation:
 Use a dedicated OS account and dedicated provider profile for Open Duet. Do not reuse a host account that has OWNERA production credentials or unrelated privileged sessions.
 
+### OD-05 — Engine environment is allow-listed by name, but not scoped to the selected engine
+
+**Risk: High when multiple provider credentials are present in the Open Duet server environment and an untrusted generic ACP command is configured.**
+
+Evidence at the pinned commit:
+- `backend/app/core/engine_env.py` puts `GOOGLE_API_KEY` in the unconditional baseline allow-list and unconditionally accepts every environment variable whose name starts with `ANTHROPIC_`, `CLAUDE_`, `CODEX_`, `OPENAI_`, or `GEMINI_`.
+- `backend/app/services/acp_adapter.py` implements the generic ACP adapter's `child_env()` by calling `local_claude_runner.child_env()` without provider-specific scoping.
+- `backend/app/services/local_claude_runner.py` builds child environments through `engine_environment()`.
+- `backend/tests/core/test_engine_env.py` verifies that engine-prefixed names are retained, but does not assert isolation between different engine types.
+
+Impact:
+An arbitrary configured ACP executable can inherit provider keys that happen to be present in the backend process environment, even if those keys belong to another provider. The global never-list protects named application secrets such as `TOKEN_ENCRYPTION_KEYS` and `DATABASE_URL`, but it does not make provider credentials mutually isolated. This is a source-confirmed overbroad environment boundary; actual exposure depends on which credentials the operator has set in the backend environment.
+
+Required mitigation:
+1. Do not configure an untrusted generic ACP command in a server process that has unrelated provider keys in its environment.
+2. Change environment construction to be adapter-specific: generic ACP should receive only a minimal OS/runtime environment plus explicitly configured credentials for that exact engine.
+3. Add tests with several synthetic provider keys and assert each adapter receives only its own allow-list; include a malicious fake ACP child that records environment variable *names* and verifies unrelated keys are absent.
+4. Keep the application-secret never-list as a separate invariant and test it independently.
+
 ## Positive controls observed
 
 - `backend/app/core/host_exec.py` centralizes a `HOST_EXECUTION_DISABLED` check for process launches in hosted mode.
