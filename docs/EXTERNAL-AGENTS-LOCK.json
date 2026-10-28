@@ -38,6 +38,18 @@
       "status": "candidate-not-installed"
     },
     {
+      "id": "open-duet",
+      "repository": "https://github.com/Anil-matcha/open-duet",
+      "research_commit": "9b67118d9f18de70fbce394093c9c95aeb79045e",
+      "upstream_head_observed_at": "2026-10-28",
+      "license_signal": "Apache-2.0 at repository root; verify exact commit, dependencies, connectors, and any bundled assets",
+      "intended_role": "general-purpose agent workspace, persistent memory, routines and task delegation; proposals only, never financial authority",
+      "execution_capable": true,
+      "status": "pinned-source-unreviewed",
+      "source_mode": "git-submodule",
+      "submodule_path": "integrations/open-duet"
+    },
+    {
       "id": "hummingbot",
       "repository": "https://github.com/hummingbot/hummingbot",
       "research_commit": "9af100d6822da7d2d0291a906c730ef172284ee2",

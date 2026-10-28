@@ -1,0 +1,3 @@
+[submodule "integrations/open-duet"]
+	path = integrations/open-duet
+	url = https://github.com/Anil-matcha/open-duet.git

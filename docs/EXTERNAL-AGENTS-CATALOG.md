@@ -15,6 +15,8 @@ Recommended first stack to evaluate:
 4. CCXT as an exchange API library behind an execution adapter, not as an autonomous strategy.
 5. Freqtrade as a backtesting/strategy engine candidate, only in a separate process/container pending GPL-3.0 distribution review.
 
+Separately, Open Duet is pinned for evaluation as an agent-workspace/task-orchestration layer, not as a financial strategy or authority provider. See `docs/OPEN-DUET-INTEGRATION.md`.
+
 Do not integrate all five at once. First stage all candidates and their licenses, pin versions/commits, then validate one vertical slice at a time.
 
 ## Candidate register
@@ -23,6 +25,7 @@ Do not integrate all five at once. First stage all candidates and their licenses
 |---|---|---|---|---|
 | FinRobot | https://github.com/AI4Finance-Foundation/FinRobot | Financial research, valuation, analysis workflows, structured reports | Apache-2.0 per upstream repository | Evaluate first for research/proposal generation. Do not grant execution authority. |
 | TradingAgents | https://github.com/TauricResearch/TradingAgents | Multi-agent market-analysis and decision-workflow experiments | Apache-2.0 per upstream repository | Evaluate as a research benchmark, not a proven profitable trading system. |
+| Open Duet | https://github.com/Anil-matcha/open-duet | General-purpose agent workspace: persistent conversations, memory, routines, delegated work, optional isolated computer | Apache-2.0 at repository root; verify bundled dependencies/connectors | Pinned as a Git submodule for source review; no financial execution authority. |
 | Hummingbot | https://github.com/hummingbot/hummingbot | Strategy runtime, market making, arbitrage and order lifecycle | Apache-2.0 per upstream repository | Strong candidate for a separate execution engine; isolate it and keep OWNERA as final policy gate. |
 | CCXT | https://github.com/ccxt/ccxt | Exchange market-data and trading API adapter library | MIT per upstream repository | Preferred connector candidate; never let an agent call private trading methods directly. Wrap allowlisted methods behind OWNERA. |
 | Freqtrade | https://github.com/freqtrade/freqtrade | Backtesting, strategy evaluation and optional isolated engine | GPL-3.0 per upstream repository | Useful technical candidate, but do not embed/distribute it with OWNERA until licensing implications are reviewed. |
