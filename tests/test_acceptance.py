@@ -217,3 +217,27 @@ def test_audit_chain_detects_modified_event(tmp_path):
     with pytest.raises(TrustedKeyRegistryError, match="digest mismatch"):
         restored.verify_audit_chain()
     restored.close()
+
+
+def test_registry_detects_key_table_tampering(tmp_path):
+    import sqlite3
+    from ownera.acceptance import TrustedCustomerKeyRegistry, TrustedKeyRegistryError
+
+    database = tmp_path / "key-row-tamper.sqlite3"
+    registry = TrustedCustomerKeyRegistry(database)
+    public = Ed25519PrivateKey.generate().public_key().public_bytes(
+        Encoding.Raw, PublicFormat.Raw
+    )
+    registry.enroll("customer", "key", public)
+    registry.close()
+    connection = sqlite3.connect(database)
+    connection.execute(
+        "UPDATE trusted_customer_keys SET active = 0 WHERE customer_id = ? AND key_id = ?",
+        ("customer", "key"),
+    )
+    connection.commit()
+    connection.close()
+    restored = TrustedCustomerKeyRegistry(database)
+    with pytest.raises(TrustedKeyRegistryError, match="differs from audit history"):
+        restored.get_active("customer", "key")
+    restored.close()
