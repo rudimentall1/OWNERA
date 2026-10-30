@@ -1,6 +1,6 @@
 # Open-Duet Integration Boundary
 
-Status: pinned source for evaluation only. It has not been installed, executed, audited, or connected to OWNERA.
+Status: pinned source for evaluation only. It has not been installed, executed, fully audited, or connected to OWNERA. A preliminary static source review is recorded in [OPEN-DUET-SECURITY-REVIEW.md](OPEN-DUET-SECURITY-REVIEW.md); it is not a full audit or runtime qualification.
 
 ## Why this source is tracked
 
@@ -34,6 +34,6 @@ Any future adapter must expose only bounded, schema-validated proposals or read-
 
 ## Next validation gate
 
-Before running this code, separately review its install/build scripts, dependencies, credential storage, auth/session boundaries, routine/webhook triggers, browser/computer tools, connector scopes, subprocess behavior, network egress, and sandbox escape surface. Run it as an unprivileged isolated service with synthetic data and no OWNERA secrets. Verify denial cases and audit continuity before designing any narrow adapter.
+Before running this code, close the findings in [OPEN-DUET-SECURITY-REVIEW.md](OPEN-DUET-SECURITY-REVIEW.md), then separately review its install/build scripts, dependencies, credential storage, auth/session boundaries, routine/webhook triggers, browser/computer tools, connector scopes, subprocess behavior, network egress, and sandbox escape surface. Run it as an unprivileged isolated service with synthetic data and no OWNERA secrets. Verify denial cases and audit continuity before designing any narrow adapter.
 
 No production integration, live-money capability, or security guarantee is claimed by adding this source pin.
