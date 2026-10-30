@@ -75,6 +75,7 @@ def test_container_has_no_network_or_host_writable_mount(monkeypatch):
         )
     )
     args = captured["args"]
+    assert "--pull=never" in args
     assert args[args.index("--network") + 1] == "none"
     assert "--read-only" in args
     assert args[args.index("--cap-drop") + 1] == "ALL"
@@ -135,6 +136,7 @@ def test_stage_inputs_writes_read_only_files(tmp_path):
     staged = tmp_path / "nested" / "input.txt"
     assert staged.read_bytes() == b"safe"
     assert staged.stat().st_mode & 0o777 == 0o444
+    assert tmp_path.stat().st_mode & 0o777 == 0o755
 
 
 def test_cleanup_runs_when_artifact_collection_fails(monkeypatch):
