@@ -128,6 +128,8 @@ class OrderToWorkforceBridge:
             raise OrderHandoffError(
                 "customer-accepted criteria differ from approved proposal"
             )
+        if order.owner_approved_by != proposal.owner_approved_by:
+            raise OrderHandoffError("order owner approver does not match proposal approval")
         if order.owner_approved_at < proposal.owner_approved_at:
             raise OrderHandoffError("order approval predates proposal approval")
         if not task_specs:
@@ -166,6 +168,22 @@ class OrderToWorkforceBridge:
         if converted_at.tzinfo is None:
             raise ValueError("conversion timestamp must be timezone-aware")
 
+        acceptance_evidence = {
+            "schema_version": 1,
+            "order_id": str(order.order_id),
+            "proposal_id": str(order.proposal_id),
+            "customer_id": order.customer_id,
+            "customer_acceptance_reference": order.customer_acceptance_ref,
+            "accepted_amount": str(order.accepted_amount),
+            "currency": order.currency.upper(),
+            "accepted_scope": order.accepted_scope,
+            "accepted_acceptance_criteria": list(order.accepted_acceptance_criteria),
+            "customer_accepted_at": order.customer_accepted_at.isoformat(),
+            "owner_approved_by": order.owner_approved_by,
+            "owner_approved_at": order.owner_approved_at.isoformat(),
+            "execution_budget_limit": str(order.execution_budget_limit),
+        }
+
         # The plan digest excludes generated task IDs so a retry after a crash
         # can resolve to the original committed task graph.
         plan_payload = [
@@ -199,6 +217,7 @@ class OrderToWorkforceBridge:
                     proposal_id=proposal.proposal_id,
                     converted_at=converted_at.isoformat(),
                     plan_digest=plan_digest,
+                    acceptance_evidence=acceptance_evidence,
                 )
                 handoff = OrderHandoff(
                     order_id=persisted.order_id,
