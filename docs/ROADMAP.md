@@ -53,6 +53,7 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Define initial worker/task contract and deterministic in-memory assignment/review lifecycle
 - [ ] Persist workforce state and append-only transition evidence
 - [x] Define initial commercial opportunity qualification and owner-approved proposal draft lifecycle
+- [x] Define customer-accepted, owner-approved order handoff into bounded workforce task graphs
 - [ ] Persist commercial and workforce state with append-only transition evidence
 - [ ] Select one narrow service with measurable demand and delivery criteria
 - [ ] Define isolated execution environments and bounded worker runtimes
