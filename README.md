@@ -14,7 +14,7 @@ The long-term goal is an owner-controlled agent operation that can find useful w
 
 The agent is powerful by design, but its authority and execution are constrained by deterministic security and policy controls.
 
-See [Resource Autonomy](docs/RESOURCE-AUTONOMY.md) for the Resource Autonomy Engine direction, [Workforce Engine](docs/WORKFORCE-ENGINE.md) for the task coordination contract, and [Resource Intelligence research](docs/RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the unclaimed-resource market investigation.
+See [Resource Autonomy](docs/RESOURCE-AUTONOMY.md) for the Resource Autonomy Engine direction, [Commercial Engine](docs/COMMERCIAL-ENGINE.md) for opportunity qualification and owner-approved proposals, [Workforce Engine](docs/WORKFORCE-ENGINE.md) for task coordination, and [Resource Intelligence research](docs/RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the unclaimed-resource market investigation.
 
 ## Core Principles
 
@@ -127,7 +127,7 @@ The Sovereign Reserve is a separate trust domain. Agents may contribute to it on
 
 **Stage: Architecture / Foundation**
 
-The repository contains foundational domain and policy interfaces, sandbox financial flows, audit and reserve boundaries, an autonomous treasury decision cycle, an isolated proposal-only external strategy protocol, and an initial in-memory workforce coordination core with deterministic assignment and independent review gates. Persistent workforce storage, isolated worker execution, commercial discovery, real financial rails, and autonomous resource acquisition are not yet implemented. The new workforce tests have been added but have not been executed in this change.
+The repository contains foundational domain and policy interfaces, sandbox financial flows, audit and reserve boundaries, an autonomous treasury decision cycle, an isolated proposal-only external strategy protocol, an initial in-memory workforce coordination core with deterministic assignment and independent review gates, and an initial in-memory commercial qualification core with conservative economics and owner approval for proposal drafts. Persistent storage, isolated worker execution, marketplace connectors, outbound proposal submission, real financial rails, and autonomous resource acquisition are not yet implemented. The new workforce and commercial tests have been added but have not been executed in this change.
 
 ## Roadmap
 
