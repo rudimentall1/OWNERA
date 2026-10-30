@@ -357,6 +357,25 @@ class SQLiteWorkforceRepository:
         finally:
             connection.close()
 
+    def load_order_acceptance_evidence(self, order_id: UUID) -> dict[str, Any]:
+        """Load and integrity-check the immutable acceptance evidence for an order."""
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT evidence_json, evidence_digest FROM order_acceptance_evidence WHERE order_id = ?",
+                (str(order_id),),
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"acceptance evidence not found for order {order_id}")
+            actual = hashlib.sha256(row["evidence_json"].encode("utf-8")).hexdigest()
+            if actual != row["evidence_digest"]:
+                raise SnapshotIntegrityError(
+                    f"acceptance evidence digest mismatch for order {order_id}"
+                )
+            return json.loads(row["evidence_json"])
+        finally:
+            connection.close()
+
     def load(self) -> WorkforceSnapshot | None:
         connection = self._connect()
         try:
