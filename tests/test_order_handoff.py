@@ -192,6 +192,10 @@ def test_order_handoff_persists_complete_task_graph_in_one_workforce_snapshot(tm
     events = restored.repository.event_store.load("workforce", "primary")
     assert [event.event_type for event in events] == ["OrderTasksHandedOff"]
     assert restored.repository.event_store.verify("workforce", "primary") is True
+    evidence = restored.repository.load_order_acceptance_evidence(order.order_id)
+    assert evidence["customer_acceptance_reference"] == order.customer_acceptance_ref
+    assert evidence["accepted_amount"] == "1000"
+    assert evidence["execution_budget_limit"] == "600"
 
 
 
@@ -214,6 +218,9 @@ def test_persistent_order_handoff_is_idempotent_across_bridge_restart(tmp_path):
     assert second_workforce.version == first_workforce.version
     events = second_workforce.repository.event_store.load("workforce", "primary")
     assert [event.event_type for event in events] == ["OrderTasksHandedOff"]
+    assert second_workforce.repository.load_order_acceptance_evidence(order.order_id) == (
+        first_workforce.repository.load_order_acceptance_evidence(order.order_id)
+    )
 
 
 def test_persistent_order_id_cannot_be_reused_for_different_task_plan(tmp_path):
@@ -276,3 +283,35 @@ def test_order_handoff_event_conflict_rolls_back_snapshot_and_idempotency_record
     assert [event.event_type for event in restored.repository.event_store.load(
         "workforce", "primary"
     )] == ["UnexpectedExternalEvent"]
+
+
+
+def test_order_acceptance_evidence_tampering_is_detected(tmp_path):
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    database = tmp_path / "ownera.sqlite3"
+    proposal = _proposal()
+    order = _order(proposal)
+    workforce = PersistentWorkforce(database)
+    OrderToWorkforceBridge().convert(order, proposal, _specs(), workforce)
+
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute(
+            "UPDATE order_acceptance_evidence SET evidence_json = ? WHERE order_id = ?",
+            ('{"tampered":true}', str(order.order_id)),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    with pytest.raises(Exception, match="evidence digest mismatch"):
+        workforce.repository.load_order_acceptance_evidence(order.order_id)
+
+
+def test_order_approver_must_match_proposal_approver():
+    proposal = _proposal()
+    order = _order(proposal, owner_approved_by="different-owner")
+
+    with pytest.raises(OrderHandoffError, match="does not match"):
+        OrderToWorkforceBridge().convert(order, proposal, _specs(), _workforce())
