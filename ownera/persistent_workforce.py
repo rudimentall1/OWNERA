@@ -9,9 +9,9 @@ from uuid import UUID
 
 from ownera.workforce import (
     TaskReview,
-    WorkTask,
     WorkerProfile,
     WorkforceEngine,
+    WorkTask,
 )
 from ownera.workforce_repository import SQLiteWorkforceRepository
 
