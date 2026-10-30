@@ -111,6 +111,7 @@ class PersistentWorkforce:
             record = self.repository.save_with_order_handoff(
                 self._engine,
                 expected_version=self._version,
+                expected_event_version=self._event_version,
                 order_id=order_id,
                 proposal_id=proposal_id,
                 task_ids=tuple(task.task_id for task in tasks),
@@ -119,6 +120,7 @@ class PersistentWorkforce:
             )
             if record.created:
                 self._version = record.snapshot_version
+                self._event_version += 1
             else:
                 self.refresh()
             return record
