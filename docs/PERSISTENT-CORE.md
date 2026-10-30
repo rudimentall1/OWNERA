@@ -18,7 +18,7 @@ Workforce transitions use the `workforce/primary` aggregate. Worker registration
 
 Order-to-workforce handoff commits the task graph, unique order idempotency record, canonical customer/owner acceptance evidence, evidence digest, snapshot, and `OrderTasksHandedOff` event in one transaction. The event binds the evidence digest. Replaying an identical handoff returns the original task IDs without appending a duplicate event; changed acceptance evidence is rejected.
 
-Acceptance evidence is integrity-checked when read by recomputing its SHA-256 digest. The recorded digest is bound into the handoff event. This proves stored-record consistency, not authenticity of the customer, contract, signature, or payment. The supplied customer acceptance reference still requires a future trusted verification adapter.
+Acceptance evidence is integrity-checked when read by recomputing its SHA-256 digest and matching that digest against the unique `OrderTasksHandedOff` event for the order. The recorded digest is bound into the hash-chained handoff event. This proves stored-record consistency, not authenticity of the customer, contract, signature, or payment. The supplied customer acceptance reference still requires a future trusted verification adapter.
 
 ## Integrity and concurrency
 
