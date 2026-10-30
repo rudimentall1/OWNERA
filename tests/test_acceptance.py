@@ -259,3 +259,21 @@ def test_verified_attestation_signature_is_persisted_with_order_evidence(tmp_pat
         order.acceptance_attestation.signature_b64
     )
     assert evidence["customer_acceptance_attestation"]["nonce"] == "nonce-1"
+
+
+def test_signature_binds_criteria_reference_order_and_nonce():
+    _, order, registry, _, _ = _signed_order()
+    mutations = (
+        {"accepted_acceptance_criteria": ("different",)},
+        {"customer_acceptance_ref": "contract:other"},
+        {"order_id": uuid4()},
+    )
+    for mutation in mutations:
+        with pytest.raises(AcceptanceVerificationError, match="signature is invalid"):
+            verify_customer_acceptance(replace(order, **mutation), registry)
+    changed_nonce = replace(
+        order,
+        acceptance_attestation=replace(order.acceptance_attestation, nonce="nonce-changed"),
+    )
+    with pytest.raises(AcceptanceVerificationError, match="signature is invalid"):
+        verify_customer_acceptance(changed_nonce, registry)
