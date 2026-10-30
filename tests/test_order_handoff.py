@@ -169,3 +169,22 @@ def test_customer_accepted_criteria_must_match_proposal():
         OrderToWorkforceBridge().convert(
             order, proposal, _specs(), _workforce()
         )
+
+
+
+def test_order_handoff_persists_complete_task_graph_in_one_workforce_snapshot(tmp_path):
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    database = tmp_path / "ownera.sqlite3"
+    workforce = PersistentWorkforce(database)
+    proposal = _proposal()
+    order = _order(proposal)
+    bridge = OrderToWorkforceBridge()
+
+    handoff = bridge.convert(order, proposal, _specs(), workforce)
+    restored = PersistentWorkforce(database)
+
+    assert len(handoff.task_ids) == 2
+    assert tuple(task.task_id for task in restored.tasks) == handoff.task_ids
+    assert restored.tasks[1].dependencies == (restored.tasks[0].task_id,)
+    assert restored.version == workforce.version
