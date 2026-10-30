@@ -229,6 +229,102 @@ class SQLiteEventStore:
         finally:
             connection.close()
 
+    def append_in_transaction(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        aggregate_type: str,
+        aggregate_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        expected_version: int,
+        idempotency_key: str | None = None,
+        occurred_at: datetime | None = None,
+    ) -> StoredEvent:
+        """Append an event using a caller-owned SQLite transaction.
+
+        The caller must have started a transaction on a connection to the same
+        database and must commit or roll back both the event and its domain write.
+        This method never commits or closes the connection.
+        """
+        if not aggregate_type.strip() or not aggregate_id.strip():
+            raise ValueError("aggregate_type and aggregate_id are required")
+        if not event_type.strip():
+            raise ValueError("event_type is required")
+        if expected_version < 0:
+            raise ValueError("expected_version cannot be negative")
+        if idempotency_key is not None and not idempotency_key.strip():
+            raise ValueError("idempotency_key cannot be empty")
+        timestamp = occurred_at or datetime.now(timezone.utc)
+        if timestamp.tzinfo is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        timestamp_text = timestamp.astimezone(timezone.utc).isoformat()
+        payload_text = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+        if idempotency_key is not None:
+            existing = connection.execute(
+                "SELECT * FROM ownera_events WHERE idempotency_key = ?",
+                (idempotency_key,),
+            ).fetchone()
+            if existing is not None:
+                same = (
+                    existing["aggregate_type"] == aggregate_type
+                    and existing["aggregate_id"] == aggregate_id
+                    and existing["event_type"] == event_type
+                    and existing["payload_json"] == payload_text
+                )
+                if not same:
+                    raise IdempotencyConflict(
+                        "idempotency key was used for different event content"
+                    )
+                return self._to_event(existing)
+        latest = connection.execute(
+            """SELECT version, event_hash FROM ownera_events
+               WHERE aggregate_type = ? AND aggregate_id = ?
+               ORDER BY version DESC LIMIT 1""",
+            (aggregate_type, aggregate_id),
+        ).fetchone()
+        current_version = latest["version"] if latest else 0
+        if current_version != expected_version:
+            raise ConcurrencyError(
+                f"expected version {expected_version}, found {current_version}"
+            )
+        version = current_version + 1
+        previous_hash = latest["event_hash"] if latest else self.GENESIS_HASH
+        event_id = uuid4()
+        hash_input = {
+            "event_id": str(event_id), "aggregate_type": aggregate_type,
+            "aggregate_id": aggregate_id, "version": version,
+            "event_type": event_type, "payload_json": payload_text,
+            "occurred_at": timestamp_text, "idempotency_key": idempotency_key,
+            "previous_hash": previous_hash,
+        }
+        canonical = json.dumps(
+            hash_input, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        event_hash = hashlib.sha256(canonical).hexdigest()
+        connection.execute(
+            """INSERT INTO ownera_events (
+                event_id, aggregate_type, aggregate_id, version, event_type,
+                payload_json, occurred_at, idempotency_key, previous_hash, event_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                str(event_id), aggregate_type, aggregate_id, version, event_type,
+                payload_text, timestamp_text, idempotency_key, previous_hash, event_hash,
+            ),
+        )
+        return StoredEvent(
+            event_id=event_id, aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id, version=version, event_type=event_type,
+            payload=json.loads(payload_text),
+            occurred_at=datetime.fromisoformat(timestamp_text),
+            idempotency_key=idempotency_key, previous_hash=previous_hash,
+            event_hash=event_hash,
+        )
+
     def load(
         self,
         aggregate_type: str,
