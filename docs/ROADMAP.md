@@ -50,8 +50,10 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 
 ## 4 — Earned Revenue and Agent Workforce
 
+- [x] Define initial worker/task contract and deterministic in-memory assignment/review lifecycle
+- [ ] Persist workforce state and append-only transition evidence
 - [ ] Select one narrow service with measurable demand and delivery criteria
-- [ ] Define agent roles, task scopes, and isolated execution environments
+- [ ] Define isolated execution environments and bounded worker runtimes
 - [ ] Discover and qualify real paid work
 - [ ] Owner-approved contracts and customer commitments
 - [ ] Deliver work and independent quality review
