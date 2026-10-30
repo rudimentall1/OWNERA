@@ -54,8 +54,9 @@ class SQLiteEventStore:
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = str(database_path)
-        if self.database_path != ":memory:":
-            Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
+        if self.database_path == ":memory:":
+            raise ValueError("use a file-backed SQLite database for durable event storage")
+        Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -67,13 +68,13 @@ class SQLiteEventStore:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 10000")
-        if self.database_path != ":memory:":
-            connection.execute("PRAGMA journal_mode = WAL")
-            connection.execute("PRAGMA synchronous = FULL")
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute("PRAGMA synchronous = FULL")
         return connection
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        connection = self._connect()
+        try:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS ownera_events (
@@ -97,6 +98,8 @@ class SQLiteEventStore:
                 ON ownera_events(aggregate_type, aggregate_id, version)
                 """
             )
+        finally:
+            connection.close()
 
     def append(
         self,
@@ -231,7 +234,8 @@ class SQLiteEventStore:
         aggregate_type: str,
         aggregate_id: str,
     ) -> tuple[StoredEvent, ...]:
-        with self._connect() as connection:
+        connection = self._connect()
+        try:
             rows = connection.execute(
                 """
                 SELECT * FROM ownera_events
@@ -240,6 +244,8 @@ class SQLiteEventStore:
                 """,
                 (aggregate_type, aggregate_id),
             ).fetchall()
+        finally:
+            connection.close()
         return tuple(self._to_event(row) for row in rows)
 
     def verify(self, aggregate_type: str, aggregate_id: str) -> bool:
