@@ -237,11 +237,27 @@ class WorkforceEngine:
         self._workers[worker.worker_id] = worker
 
     def add_task(self, task: WorkTask) -> None:
-        if task.task_id in self._tasks:
+        self.add_tasks((task,))
+
+    def add_tasks(self, tasks: tuple[WorkTask, ...]) -> None:
+        """Validate and register a complete task batch without partial mutation."""
+        if not tasks:
+            raise WorkforceError("at least one task is required")
+        batch_ids = [task.task_id for task in tasks]
+        if len(batch_ids) != len(set(batch_ids)):
+            raise WorkforceError("task batch contains duplicate task IDs")
+        if any(task_id in self._tasks for task_id in batch_ids):
             raise WorkforceError("task already exists")
-        if any(dependency not in self._tasks for dependency in task.dependencies):
-            raise WorkforceError("all task dependencies must exist before task creation")
-        self._tasks[task.task_id] = task
+
+        available_ids = set(self._tasks)
+        for task in tasks:
+            if any(dependency not in available_ids for dependency in task.dependencies):
+                raise WorkforceError(
+                    "all task dependencies must exist before task creation"
+                )
+            available_ids.add(task.task_id)
+
+        self._tasks.update((task.task_id, task) for task in tasks)
 
     def assign(self, task_id: UUID) -> WorkTask:
         task = self._get_task(task_id)
