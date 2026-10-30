@@ -1,50 +1,41 @@
 # OWNERA Workforce Persistence
 
-**Status:** Initial SQLite snapshot persistence for the workforce engine is implemented. Commercial and order aggregates remain in memory.  
-**Code:** `ownera/workforce_repository.py`, `ownera/persistent_workforce.py`, `ownera/workforce.py`  
-**Tests:** `tests/test_workforce_repository.py`
+**Status:** Workforce lifecycle transitions now commit their versioned snapshot and hash-chained event in one SQLite transaction. Order handoff still uses its own atomic snapshot/idempotency transaction and is not yet coupled to the event stream.
+**Code:** `ownera/workforce_repository.py`, `ownera/persistent_workforce.py`, `ownera/workforce.py`
+**Tests:** `tests/test_workforce_repository.py`, `tests/test_persistent_workforce.py`
 
 ## What is persisted
 
-The repository stores a complete versioned snapshot of:
-- worker profiles and capabilities;
-- task definitions, dependencies and lifecycle status;
-- assigned worker, execution cost and submitted artifact references;
-- result summaries and reviewer references;
-- review decisions, findings and timestamps.
+The repository stores a complete versioned snapshot of worker profiles, task definitions and dependencies, task lifecycle status, assignment, execution cost, artifact references, result summaries, reviewer references, and review decisions. Decimal values are serialized as strings. UUIDs and timestamps use canonical textual representations. The snapshot payload is hashed with SHA-256 and verified before restoration.
 
-Decimal values are serialized as strings. UUIDs and timestamps use canonical textual representations. The snapshot payload is hashed with SHA-256 and verified before restoration.
+## Atomic lifecycle events
 
-## Automatic transition persistence
+The application-facing `PersistentWorkforce` facade records these transitions:
+- `WorkerRegistered`
+- `TaskCreated`
+- `TaskAssigned`
+- `TaskStarted`
+- `TaskSubmitted`
+- `TaskReviewAccepted` or `TaskReviewRejected`
 
-Use `PersistentWorkforce` as the application-facing facade instead of calling `WorkforceEngine` directly. Worker registration, task creation, assignment, start, submission and review are saved before the command returns successfully. If a save fails, the facade reloads the last committed snapshot and raises the error. A stale process cannot silently overwrite a newer snapshot; it receives a version conflict and refreshes to committed state.
+Each successful command writes the new workforce snapshot and its event in the same SQLite `BEGIN IMMEDIATE` transaction. Event payloads capture the relevant worker/task identifiers, capabilities, budget, assignment, submitted artifacts, cost, result summary, and review outcome. A failed event append rolls back the snapshot write. The facade verifies the event hash chain during initialization and refresh.
 
-The facade is synchronous and uses one whole-workforce snapshot. It is suitable for the current single-process MVP and basic stale-writer detection, not a distributed job queue or high-throughput multi-tenant service.
+A stale process cannot silently overwrite a newer snapshot or event version. On failure, it reloads the last committed snapshot and event version before raising the original error.
 
-## Save protocol
+## Save protocol and limits
 
-Each save requires the caller's expected snapshot version. The repository uses a SQLite `BEGIN IMMEDIATE` transaction and rejects stale writers. A successful save increments the snapshot version exactly once.
+Each save requires expected snapshot and event versions. The repository uses optimistic concurrency and increments the snapshot and event versions exactly once per accepted transition. The event aggregate is `workforce/primary`, reflecting the current single-workforce MVP.
 
-This is whole-state snapshot persistence, not event sourcing. The separate event store remains an append-only audit primitive and is not yet integrated with workforce transitions.
+The facade is synchronous and stores a whole-workforce snapshot on every transition. This is suitable for the current single-owner MVP, not a distributed job queue or high-throughput multi-tenant service. The event log is tamper-evident, not tamper-proof.
 
 ## Recovery
 
-On startup, load the snapshot and restore a `WorkforceEngine` instance. A missing snapshot means the workforce has not yet been initialized. A digest mismatch or invalid schema must stop recovery; the application must not silently start with an empty workforce and discard the damaged state.
+On startup, the facade verifies the workforce event chain and restores the latest integrity-checked snapshot. A digest mismatch, invalid schema, or broken event chain must stop recovery. The application must not silently initialize an empty workforce and discard damaged state.
 
-## Current limits
+## Remaining production gates
 
-- One primary workforce snapshot per database.
-- Whole-workforce snapshot writes on each transition may become expensive as task history grows.
-- No atomic transaction spanning order handoff and workforce persistence yet.
-- No commercial opportunity, assessment, proposal or order repositories.
-- No encrypted database, automated backup, restore drill or external hash checkpoint.
-- Snapshot integrity is tamper-evident, not tamper-proof against a privileged attacker able to rewrite the payload and digest.
-
-## Next production gates
-
-1. Replace whole-state snapshots with transactional aggregate/event persistence as workload grows.
-2. Add transactional order handoff so a crash cannot create partial task graphs.
-3. Add repositories for commercial opportunities, assessments, proposals and customer orders.
-4. Add backup, restore and crash-injection tests.
-5. Add a startup recovery check that refuses unsafe partial initialization.
-6. Add an isolated worker runtime only after durable task state and recovery are reliable.
+- Couple order-handoff idempotency records and task-graph creation to the same event transaction.
+- Add backup, restore, crash-injection, and process-kill recovery tests.
+- Add external event checkpoints or signatures, protected backups, and access controls.
+- Add isolated worker execution only after durable task state and recovery are reliable.
+- Replace whole-state snapshots when measured workload justifies a more granular persistence model.
