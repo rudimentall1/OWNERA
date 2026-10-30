@@ -41,6 +41,7 @@ class CustomerOrder:
     owner_approved_at: datetime
     execution_budget_limit: Decimal
     order_id: UUID = field(default_factory=uuid4)
+    acceptance_attestation: CustomerAcceptanceAttestation | None = None
 
     def __post_init__(self) -> None:
         if not self.customer_id.strip():
@@ -101,8 +102,13 @@ class OrderHandoff:
 class OrderToWorkforceBridge:
     """Validates customer/owner approvals and converts an order exactly once."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, *, trusted_keys: TrustedCustomerKeyRegistry | None = None,
+        require_verified_acceptance: bool = False,
+    ) -> None:
         self._handoffs: dict[UUID, OrderHandoff] = {}
+        self._trusted_keys = trusted_keys
+        self._require_verified_acceptance = require_verified_acceptance
 
     @property
     def handoffs(self) -> tuple[OrderHandoff, ...]:
@@ -119,6 +125,14 @@ class OrderToWorkforceBridge:
     ) -> OrderHandoff:
         if order.order_id in self._handoffs:
             raise OrderHandoffError("order has already been converted")
+        acceptance_verification = None
+        if self._trusted_keys is not None and order.acceptance_attestation is not None:
+            try:
+                acceptance_verification = verify_customer_acceptance(order, self._trusted_keys)
+            except AcceptanceVerificationError as exc:
+                raise OrderHandoffError(str(exc)) from exc
+        if self._require_verified_acceptance and acceptance_verification is None:
+            raise OrderHandoffError("verified customer acceptance is required")
         if proposal.proposal_id != order.proposal_id:
             raise OrderHandoffError("order does not reference this proposal")
         if proposal.status is not ProposalStatus.APPROVED_FOR_SUBMISSION:
@@ -189,6 +203,14 @@ class OrderToWorkforceBridge:
             "owner_approved_by": order.owner_approved_by,
             "owner_approved_at": order.owner_approved_at.isoformat(),
             "execution_budget_limit": str(order.execution_budget_limit),
+            "acceptance_verification": (
+                {"status": acceptance_verification.status, "key_id": acceptance_verification.key_id,
+                 "attestation_digest": acceptance_verification.attestation_digest,
+                 "reason": acceptance_verification.reason}
+                if acceptance_verification is not None else
+                {"status": "UNVERIFIED", "key_id": None, "attestation_digest": None,
+                 "reason": "no trusted signature configured"}
+            ),
         }
 
         evidence_json = json.dumps(
