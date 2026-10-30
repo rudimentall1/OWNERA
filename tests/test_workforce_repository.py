@@ -23,16 +23,15 @@ def _engine_with_completed_task():
             WorkerProfile("reviewer", "qa", frozenset({"quality.review"})),
         )
     )
-    task = engine.add_task(
-        WorkTask(
-            title="Build API",
-            description="Implement the agreed API.",
-            required_capabilities=frozenset({"python"}),
-            budget_limit=Decimal("100"),
-            currency="EUR",
-            acceptance_criteria=("Endpoint works",),
-        )
+    task = WorkTask(
+        title="Build API",
+        description="Implement the agreed API.",
+        required_capabilities=frozenset({"python"}),
+        budget_limit=Decimal("100"),
+        currency="EUR",
+        acceptance_criteria=("Endpoint works",),
     )
+    engine.add_task(task)
     assigned = engine.assign(task.task_id)
     engine.start(task.task_id, assigned.assigned_worker_id)
     engine.submit(
