@@ -16,7 +16,9 @@ Commercial transitions use the `commercial_pipeline/primary` aggregate. Opportun
 
 Workforce transitions use the `workforce/primary` aggregate. Worker registration, task creation, assignment, start, submission, and review commit the workforce snapshot and matching event atomically. Event-version conflicts roll back the domain snapshot write.
 
-Order-to-workforce handoff commits the task graph, unique order idempotency record, snapshot, and `OrderTasksHandedOff` event in one transaction. Replaying an identical handoff returns the original task IDs without appending a duplicate event.
+Order-to-workforce handoff commits the task graph, unique order idempotency record, canonical customer/owner acceptance evidence, evidence digest, snapshot, and `OrderTasksHandedOff` event in one transaction. The event binds the evidence digest. Replaying an identical handoff returns the original task IDs without appending a duplicate event; changed acceptance evidence is rejected.
+
+Acceptance evidence is integrity-checked when read by recomputing its SHA-256 digest. The recorded digest is bound into the handoff event. This proves stored-record consistency, not authenticity of the customer, contract, signature, or payment. The supplied customer acceptance reference still requires a future trusted verification adapter.
 
 ## Integrity and concurrency
 
@@ -34,7 +36,7 @@ This is tamper-evident, not tamper-proof. A privileged attacker able to rewrite 
 
 ## Next integration sequence
 
-1. Add durable customer acceptance and contract evidence before order creation.
+1. Add trusted verification of customer acceptance references and contract/signature evidence.
 2. Add backup/restore and crash-recovery tests across repositories.
 3. Add external event checkpoints or signatures.
 4. Move to PostgreSQL only when concurrent deployment or operational requirements justify it.
