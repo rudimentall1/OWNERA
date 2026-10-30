@@ -7,9 +7,10 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
-import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+import pytest
 
 from ownera.acceptance import (
     AcceptanceVerificationError,
@@ -131,8 +132,6 @@ def test_registry_survives_restart_and_audit_chain_verifies(tmp_path):
 
 
 def test_key_rotation_is_atomic_and_revokes_previous_key(tmp_path):
-    from ownera.acceptance import TrustedCustomerKeyRegistry
-
     _, order, registry, _, _ = _signed_order()
     old = registry.get_active("customer-1", "key-1")
     database = tmp_path / "rotation.sqlite3"
@@ -182,7 +181,6 @@ def test_key_rotation_rolls_back_if_replacement_id_already_exists(tmp_path):
     registry.enroll("customer", "old", first)
     registry.enroll("customer", "new", second)
     before = registry.audit_events()
-    import sqlite3
     with pytest.raises(sqlite3.IntegrityError):
         registry.rotate("customer", "old", "new", second)
     assert registry.get_active("customer", "old").active is True
