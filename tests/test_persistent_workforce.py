@@ -9,6 +9,7 @@ from ownera.workforce import (
     WorkTask,
 )
 from ownera.workforce_repository import SnapshotConflict
+from ownera.event_store import SQLiteEventStore, ConcurrencyError
 
 
 def _task():
@@ -67,3 +68,75 @@ def test_stale_process_reloads_committed_state_and_rejects_write(tmp_path):
 
     assert second.workers == first.workers
     assert second.version == first.version
+
+
+
+def test_workforce_lifecycle_is_atomically_recorded_in_hash_chained_events(tmp_path):
+    database = tmp_path / "ownera.sqlite3"
+    workforce = PersistentWorkforce(database)
+    workforce.register_worker(
+        WorkerProfile("builder", "backend", frozenset({"python"}))
+    )
+    workforce.register_worker(
+        WorkerProfile("reviewer", "qa", frozenset({"quality.review"}))
+    )
+    task = _task()
+    workforce.add_task(task)
+    assigned = workforce.assign(task.task_id)
+    workforce.start(task.task_id, assigned.assigned_worker_id)
+    workforce.submit(
+        task.task_id,
+        assigned.assigned_worker_id,
+        summary="Implementation complete",
+        artifact_refs=("commit:abc123",),
+        actual_cost=Decimal("80"),
+    )
+    workforce.review(task.task_id, "reviewer", accepted=True)
+
+    events = workforce.repository.event_store.load("workforce", "primary")
+    assert [event.event_type for event in events] == [
+        "WorkerRegistered",
+        "WorkerRegistered",
+        "TaskCreated",
+        "TaskAssigned",
+        "TaskStarted",
+        "TaskSubmitted",
+        "TaskReviewAccepted",
+    ]
+    assert workforce.repository.event_store.verify("workforce", "primary") is True
+    assert workforce.event_version == 7
+
+    restored = PersistentWorkforce(database)
+    assert restored.version == workforce.version
+    assert restored.event_version == workforce.event_version
+    assert restored.tasks[0].status is TaskStatus.ACCEPTED
+
+
+def test_event_version_conflict_rolls_back_workforce_snapshot(tmp_path):
+    database = tmp_path / "ownera.sqlite3"
+    workforce = PersistentWorkforce(database)
+    original_version = workforce.version
+    original_workers = workforce.workers
+
+    # Simulate an unexpected writer advancing the event aggregate only.
+    external = SQLiteEventStore(database)
+    external.append(
+        aggregate_type="workforce",
+        aggregate_id="primary",
+        event_type="UnexpectedExternalEvent",
+        payload={"source": "test"},
+        expected_version=0,
+        idempotency_key="external-test-event",
+    )
+
+    with pytest.raises(ConcurrencyError):
+        workforce.register_worker(
+            WorkerProfile("builder", "backend", frozenset({"python"}))
+        )
+
+    restored = PersistentWorkforce(database)
+    assert restored.version == original_version
+    assert restored.workers == original_workers
+    assert [event.event_type for event in restored.repository.event_store.load(
+        "workforce", "primary"
+    )] == ["UnexpectedExternalEvent"]
