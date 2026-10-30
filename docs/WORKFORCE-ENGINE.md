@@ -1,6 +1,6 @@
 # OWNERA Workforce Engine
 
-**Status:** Initial deterministic coordination core implemented; execution adapters and persistence are not implemented.  
+**Status:** Deterministic coordination and persistence implemented; an opt-in Docker execution adapter exists but is not yet connected to task transitions or production infrastructure.  
 **Code:** `ownera/workforce.py`  
 **Tests:** `tests/test_workforce.py`
 
@@ -71,7 +71,7 @@ A task cannot be assigned until all dependencies are accepted. The assigned work
 - independent review by a worker with `quality.review`;
 - acceptance or rework decision and an in-memory review record.
 
-The current implementation is in-memory and synchronous. It does not persist tasks, start model runtimes, execute code, call external services, manage credentials, submit customer messages, sign transactions, or verify customer payment.
+The coordination engine remains synchronous. Persistence is supplied by PersistentWorkforce. The new DockerWorkerRuntime can execute a bounded command in a digest-pinned container, but it is an opt-in adapter and is not yet invoked by task lifecycle transitions. It does not call external services on behalf of OWNERA, manage credentials, submit customer messages, sign transactions, or verify customer payment.
 
 ## Security and authority boundaries
 
@@ -94,10 +94,19 @@ The current implementation is in-memory and synchronous. It does not persist tas
 
 ### Gate 2 — Isolated execution adapter
 
-- Define a provider-neutral worker runtime protocol.
-- Execute one bounded task in a dedicated unprivileged container or remote runner.
-- Enforce CPU, memory, wall-clock, output and network limits.
-- Do not mount host Docker socket or owner secrets.
+Initial adapter implemented in `ownera/worker_runtime.py`:
+
+- Provider-neutral WorkerRuntime protocol and Docker implementation.
+- Digest-pinned image, unprivileged UID, read-only root filesystem and read-only task input mount.
+- Network disabled, capabilities dropped, no-new-privileges, CPU/memory/PID/file-size/wall-clock/output limits.
+- Bounded tmpfs workspace; no host Docker socket, host home, writable host mount, credentials, or inherited environment.
+- Explicit artifact collection and container cleanup.
+
+Remaining acceptance work:
+
+- Deploy on a dedicated hardened Linux runner.
+- Run real-container adversarial tests for network, host access, resource exhaustion, timeout, output flooding and artifact path attacks.
+- Connect runtime execution to persisted task transitions only after the runner passes acceptance.
 
 ### Gate 3 — First commercial delivery loop
 
