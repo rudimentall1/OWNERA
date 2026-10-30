@@ -13,6 +13,7 @@ from ownera.order_handoff import (
     TaskSpec,
 )
 from ownera.workforce import TaskStatus, WorkerProfile, WorkforceEngine
+from ownera.workforce_repository import SnapshotIntegrityError
 
 
 def _proposal(status=ProposalStatus.APPROVED_FOR_SUBMISSION):
@@ -196,6 +197,7 @@ def test_order_handoff_persists_complete_task_graph_in_one_workforce_snapshot(tm
     assert evidence["customer_acceptance_reference"] == order.customer_acceptance_ref
     assert evidence["accepted_amount"] == "1000"
     assert evidence["execution_budget_limit"] == "600"
+    assert events[0].payload["acceptance_evidence_digest"] == handoff.evidence_digest
 
 
 
@@ -280,6 +282,14 @@ def test_order_handoff_event_conflict_rolls_back_snapshot_and_idempotency_record
     finally:
         connection.close()
     assert count == 0
+    connection = sqlite3.connect(database)
+    try:
+        evidence_count = connection.execute(
+            "SELECT COUNT(*) FROM order_acceptance_evidence"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    assert evidence_count == 0
     assert [event.event_type for event in restored.repository.event_store.load(
         "workforce", "primary"
     )] == ["UnexpectedExternalEvent"]
@@ -305,7 +315,7 @@ def test_order_acceptance_evidence_tampering_is_detected(tmp_path):
     finally:
         connection.close()
 
-    with pytest.raises(Exception, match="evidence digest mismatch"):
+    with pytest.raises(SnapshotIntegrityError, match="evidence digest mismatch"):
         workforce.repository.load_order_acceptance_evidence(order.order_id)
 
 
