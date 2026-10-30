@@ -1,0 +1,56 @@
+# OWNERA Persistent Event Store
+
+**Status:** Initial durable SQLite event-store primitive implemented. Commercial, workforce and order-handoff services are not yet wired to it.  
+**Code:** `ownera/event_store.py`  
+**Tests:** `tests/test_event_store.py`
+
+## Why this exists
+
+The first Commercial Engine, Workforce Engine and Order-to-Workforce Bridge keep state in process memory. That is suitable for deterministic domain prototypes, but it is not durable. Restarting the process loses their current state.
+
+This module introduces a file-backed persistence primitive without changing those domain APIs prematurely.
+
+## Stored event model
+
+Each event contains:
+- event UUID;
+- aggregate type and aggregate ID;
+- monotonically increasing aggregate version;
+- event type;
+- canonical JSON payload;
+- UTC timestamp;
+- optional idempotency key;
+- previous event hash;
+- current SHA-256 event hash.
+
+The SQLite schema enforces unique aggregate versions and globally unique idempotency keys. Writes use `BEGIN IMMEDIATE` and optimistic expected-version checks. WAL mode and FULL synchronous mode are enabled for the file-backed database.
+
+## Integrity and concurrency
+
+Events are hash-chained per aggregate. `verify(aggregate_type, aggregate_id)` recomputes each event hash and checks the version sequence and predecessor links.
+
+This is tamper-evident, not tamper-proof. A privileged attacker who can rewrite the entire database and recompute every hash can replace the history. Production hardening requires external checkpoints or signatures, protected backups, access controls and monitoring.
+
+Optimistic concurrency prevents two writers from silently appending to the same aggregate version. An idempotency key safely returns the original event for an identical request and rejects reuse for different event content.
+
+## Deliberate limitations
+
+- File-backed SQLite only; use a temporary file in tests rather than an in-memory connection.
+- No ORM or external dependency; Python standard library only.
+- No domain-specific repositories or automatic serialization of domain dataclasses yet.
+- No event replay into CommercialEngine, WorkforceEngine or OrderToWorkforceBridge yet.
+- No snapshots, multi-process deployment guarantees beyond SQLite locking, backup automation, encryption-at-rest configuration or remote replication.
+- The event store does not authorize business transitions. Domain services must validate first, then append the corresponding event.
+
+## Next integration sequence
+
+1. Add explicit serializers for commercial opportunities, assessments, proposals, customer orders, worker profiles, tasks and reviews.
+2. Add repository adapters that persist domain events and rebuild state on startup.
+3. Make order conversion and task creation transactional, with unique order handoff constraints.
+4. Add append-only approval and audit records with actor, timestamp, policy version and evidence reference.
+5. Add backup/restore tests and crash-recovery tests.
+6. Move to PostgreSQL only when concurrent deployment or operational requirements justify it.
+
+## Production acceptance gate
+
+A process restart must restore the exact proposal, approval, order, task and review state. Duplicate requests must not create duplicate work. A modified event must fail integrity verification. A stale writer must not overwrite a newer aggregate version. Backups must be restorable and verified.
