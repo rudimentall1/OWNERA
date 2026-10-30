@@ -1,6 +1,6 @@
 # OWNERA Persistent Event Store
 
-**Status:** Commercial and workforce lifecycle transitions now commit their versioned snapshots and append-only events in one SQLite transaction. Order-handoff persistence is atomic for its snapshot and idempotency record, but is not yet coupled to the event stream.
+**Status:** Commercial transitions, workforce lifecycle transitions, and order handoffs commit their versioned snapshots and append-only events in one SQLite transaction.
 **Code:** `ownera/event_store.py`, `ownera/commercial_repository.py`, `ownera/persistent_commercial.py`, `ownera/workforce_repository.py`, `ownera/persistent_workforce.py`
 **Tests:** `tests/test_event_store.py`, `tests/test_commercial_repository.py`, `tests/test_persistent_workforce.py`
 
@@ -16,7 +16,7 @@ Commercial transitions use the `commercial_pipeline/primary` aggregate. Opportun
 
 Workforce transitions use the `workforce/primary` aggregate. Worker registration, task creation, assignment, start, submission, and review commit the workforce snapshot and matching event atomically. Event-version conflicts roll back the domain snapshot write.
 
-The order-to-workforce handoff still commits the task graph and order idempotency record together, but does not yet append an event in that same transaction. This is the next persistence gap to close.
+Order-to-workforce handoff commits the task graph, unique order idempotency record, snapshot, and `OrderTasksHandedOff` event in one transaction. Replaying an identical handoff returns the original task IDs without appending a duplicate event.
 
 ## Integrity and concurrency
 
@@ -34,11 +34,10 @@ This is tamper-evident, not tamper-proof. A privileged attacker able to rewrite 
 
 ## Next integration sequence
 
-1. Couple order-handoff idempotency records, task graph, snapshot, and event in one transaction.
-2. Add durable customer acceptance and contract evidence before order creation.
-3. Add backup/restore and crash-recovery tests across repositories.
-4. Add external event checkpoints or signatures.
-5. Move to PostgreSQL only when concurrent deployment or operational requirements justify it.
+1. Add durable customer acceptance and contract evidence before order creation.
+2. Add backup/restore and crash-recovery tests across repositories.
+3. Add external event checkpoints or signatures.
+4. Move to PostgreSQL only when concurrent deployment or operational requirements justify it.
 
 ## Production acceptance gate
 
