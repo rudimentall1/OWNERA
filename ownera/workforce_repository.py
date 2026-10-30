@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from ownera.event_store import SQLiteEventStore, StoredEvent
 from ownera.workforce import WorkforceEngine
 
 
@@ -53,6 +54,7 @@ class SQLiteWorkforceRepository:
         if self.database_path == ":memory:":
             raise ValueError("workforce snapshots require a file-backed database")
         Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
+        self.event_store = SQLiteEventStore(database_path)
         connection = self._connect()
         try:
             connection.execute(
@@ -136,6 +138,63 @@ class SQLiteWorkforceRepository:
         finally:
             connection.close()
 
+
+    def save_with_event(
+        self,
+        engine: WorkforceEngine,
+        *,
+        expected_version: int,
+        expected_event_version: int,
+        event_type: str,
+        payload: dict[str, Any],
+        idempotency_key: str,
+    ) -> tuple[int, StoredEvent]:
+        """Commit the workforce snapshot and its lifecycle event atomically."""
+        if expected_version < 0 or expected_event_version < 0:
+            raise ValueError("expected versions cannot be negative")
+        payload_json = json.dumps(
+            engine.to_snapshot(), sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+        digest = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT version FROM workforce_snapshots WHERE snapshot_id = ?",
+                (self.SNAPSHOT_ID,),
+            ).fetchone()
+            current = row["version"] if row else 0
+            if current != expected_version:
+                raise SnapshotConflict(
+                    f"expected snapshot version {expected_version}, found {current}"
+                )
+            event = self.event_store.append_in_transaction(
+                connection,
+                aggregate_type="workforce",
+                aggregate_id=self.SNAPSHOT_ID,
+                event_type=event_type,
+                payload=payload,
+                expected_version=expected_event_version,
+                idempotency_key=idempotency_key,
+            )
+            next_version = current + 1
+            connection.execute(
+                """INSERT INTO workforce_snapshots(
+                    snapshot_id, version, payload_json, digest
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(snapshot_id) DO UPDATE SET
+                    version=excluded.version, payload_json=excluded.payload_json,
+                    digest=excluded.digest""",
+                (self.SNAPSHOT_ID, next_version, payload_json, digest),
+            )
+            connection.commit()
+            return next_version, event
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def save_with_order_handoff(
         self,
