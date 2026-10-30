@@ -12,7 +12,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from ownera.commercial import ProposalDraft, ProposalStatus
-from ownera.workforce import WorkTask, WorkforceEngine
+from ownera.workforce import WorkforceEngine, WorkTask
 
 
 class OrderHandoffError(RuntimeError):
