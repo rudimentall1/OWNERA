@@ -220,7 +220,41 @@ class TrustedCustomerKeyRegistry:
             self._connection.rollback()
             raise
 
+    def verify_registry_integrity(self) -> bool:
+        """Verify the audit chain and ensure key rows match audited lifecycle state."""
+        self.verify_audit_chain()
+        expected: dict[tuple[str, str], dict[str, object]] = {}
+        for event in self.audit_events():
+            identity = (str(event["customer_id"]), str(event["key_id"]))
+            payload = json.loads(str(event["payload_json"]))
+            if event["event_type"] == "KEY_ENROLLED":
+                expected[identity] = {
+                    "active": True,
+                    "public_key_sha256": payload["public_key_sha256"],
+                }
+            elif event["event_type"] == "KEY_REVOKED":
+                if identity not in expected or not expected[identity]["active"]:
+                    raise TrustedKeyRegistryError("audit contains an invalid key revocation")
+                expected[identity]["active"] = False
+            else:
+                raise TrustedKeyRegistryError("audit contains an unknown key lifecycle event")
+        rows = self._connection.execute(
+            "SELECT customer_id, key_id, public_key_b64, active FROM trusted_customer_keys"
+        ).fetchall()
+        actual = {(row["customer_id"], row["key_id"]): row for row in rows}
+        if set(actual) != set(expected):
+            raise TrustedKeyRegistryError("trusted-key records do not match audit history")
+        for identity, state in expected.items():
+            row = actual[identity]
+            fingerprint = hashlib.sha256(
+                base64.b64decode(row["public_key_b64"], validate=True)
+            ).hexdigest()
+            if fingerprint != state["public_key_sha256"] or bool(row["active"]) != state["active"]:
+                raise TrustedKeyRegistryError("trusted-key record differs from audit history")
+        return True
+
     def get_active(self, customer_id: str, key_id: str) -> TrustedCustomerKey:
+        self.verify_registry_integrity()
         row = self._connection.execute(
             """SELECT customer_id, key_id, public_key_b64, active
                FROM trusted_customer_keys WHERE customer_id = ? AND key_id = ?""",
