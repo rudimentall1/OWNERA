@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
@@ -188,6 +189,9 @@ def test_order_handoff_persists_complete_task_graph_in_one_workforce_snapshot(tm
     assert tuple(task.task_id for task in restored.tasks) == handoff.task_ids
     assert restored.tasks[1].dependencies == (restored.tasks[0].task_id,)
     assert restored.version == workforce.version
+    events = restored.repository.event_store.load("workforce", "primary")
+    assert [event.event_type for event in events] == ["OrderTasksHandedOff"]
+    assert restored.repository.event_store.verify("workforce", "primary") is True
 
 
 
@@ -208,6 +212,8 @@ def test_persistent_order_handoff_is_idempotent_across_bridge_restart(tmp_path):
     assert replay == first
     assert tuple(task.task_id for task in second_workforce.tasks) == first.task_ids
     assert second_workforce.version == first_workforce.version
+    events = second_workforce.repository.event_store.load("workforce", "primary")
+    assert [event.event_type for event in events] == ["OrderTasksHandedOff"]
 
 
 def test_persistent_order_id_cannot_be_reused_for_different_task_plan(tmp_path):
@@ -233,3 +239,40 @@ def test_persistent_order_id_cannot_be_reused_for_different_task_plan(tmp_path):
         OrderToWorkforceBridge().convert(order, proposal, changed_specs, restarted)
 
     assert len(restarted.tasks) == 2
+
+
+
+def test_order_handoff_event_conflict_rolls_back_snapshot_and_idempotency_record(tmp_path):
+    from ownera.event_store import SQLiteEventStore
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    database = tmp_path / "ownera.sqlite3"
+    workforce = PersistentWorkforce(database)
+    initial_version = workforce.version
+    external = SQLiteEventStore(database)
+    external.append(
+        aggregate_type="workforce",
+        aggregate_id="primary",
+        event_type="UnexpectedExternalEvent",
+        payload={"source": "test"},
+        expected_version=0,
+        idempotency_key="external-order-test-event",
+    )
+
+    proposal = _proposal()
+    order = _order(proposal)
+    with pytest.raises(OrderHandoffError, match="registration failed"):
+        OrderToWorkforceBridge().convert(order, proposal, _specs(), workforce)
+
+    restored = PersistentWorkforce(database)
+    assert restored.version == initial_version
+    assert restored.tasks == ()
+    connection = sqlite3.connect(database)
+    try:
+        count = connection.execute("SELECT COUNT(*) FROM order_handoffs").fetchone()[0]
+    finally:
+        connection.close()
+    assert count == 0
+    assert [event.event_type for event in restored.repository.event_store.load(
+        "workforce", "primary"
+    )] == ["UnexpectedExternalEvent"]
