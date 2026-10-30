@@ -1,12 +1,12 @@
 # OWNERA Persistent Event Store
 
-**Status:** Initial durable SQLite event-store primitive implemented. Commercial, workforce and order-handoff services are not yet wired to it.  
+**Status:** Durable SQLite event-store primitive implemented. Workforce and commercial domain state now also have separate versioned snapshot repositories. The event store is not yet wired into those domain transitions.  
 **Code:** `ownera/event_store.py`  
 **Tests:** `tests/test_event_store.py`
 
 ## Why this exists
 
-The first Commercial Engine, Workforce Engine and Order-to-Workforce Bridge keep state in process memory. That is suitable for deterministic domain prototypes, but it is not durable. Restarting the process loses their current state.
+The initial Commercial Engine, Workforce Engine and Order-to-Workforce Bridge began as in-memory domain prototypes. File-backed snapshot persistence now restores commercial opportunities, assessments, qualification results, proposals and owner approvals, as well as workforce tasks and reviews. The event store remains a separate primitive and does not yet record these transitions.
 
 This module introduces a file-backed persistence primitive without changing those domain APIs prematurely.
 
@@ -37,19 +37,18 @@ Optimistic concurrency prevents two writers from silently appending to the same 
 
 - File-backed SQLite only; use a temporary file in tests rather than an in-memory connection.
 - No ORM or external dependency; Python standard library only.
-- No domain-specific repositories or automatic serialization of domain dataclasses yet.
+- Commercial and workforce snapshot repositories exist, but are separate from this event store.
 - No event replay into CommercialEngine, WorkforceEngine or OrderToWorkforceBridge yet.
 - No snapshots, multi-process deployment guarantees beyond SQLite locking, backup automation, encryption-at-rest configuration or remote replication.
 - The event store does not authorize business transitions. Domain services must validate first, then append the corresponding event.
 
 ## Next integration sequence
 
-1. Add explicit serializers for commercial opportunities, assessments, proposals, customer orders, worker profiles, tasks and reviews.
-2. Add repository adapters that persist domain events and rebuild state on startup.
-3. Make order conversion and task creation transactional, with unique order handoff constraints.
-4. Add append-only approval and audit records with actor, timestamp, policy version and evidence reference.
-5. Add backup/restore tests and crash-recovery tests.
-6. Move to PostgreSQL only when concurrent deployment or operational requirements justify it.
+1. Integrate append-only commercial, order and workforce transition events with their snapshot writes.
+2. Add durable customer acceptance and contract evidence before order creation.
+3. Add append-only approval and audit records with actor, timestamp, policy version and evidence reference.
+4. Add backup/restore tests and crash-recovery tests across all repositories.
+5. Move to PostgreSQL only when concurrent deployment or operational requirements justify it.
 
 ## Production acceptance gate
 
