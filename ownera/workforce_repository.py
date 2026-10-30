@@ -117,21 +117,6 @@ class SQLiteWorkforceRepository:
                 raise SnapshotConflict(
                     f"expected snapshot version {expected_version}, found {current_version}"
                 )
-            self.event_store.append_in_transaction(
-                connection,
-                aggregate_type="workforce",
-                aggregate_id=self.SNAPSHOT_ID,
-                event_type="OrderTasksHandedOff",
-                payload={
-                    "order_id": str(order_id),
-                    "proposal_id": str(proposal_id),
-                    "task_ids": [str(item) for item in task_ids],
-                    "converted_at": converted_at,
-                    "plan_digest": plan_digest,
-                },
-                expected_version=expected_event_version,
-                idempotency_key=f"OrderTasksHandedOff:{order_id}:{plan_digest}",
-            )
             next_version = current_version + 1
             connection.execute(
                 """
@@ -275,6 +260,21 @@ class SQLiteWorkforceRepository:
                 raise SnapshotConflict(
                     f"expected snapshot version {expected_version}, found {current_version}"
                 )
+            self.event_store.append_in_transaction(
+                connection,
+                aggregate_type="workforce",
+                aggregate_id=self.SNAPSHOT_ID,
+                event_type="OrderTasksHandedOff",
+                payload={
+                    "order_id": str(order_id),
+                    "proposal_id": str(proposal_id),
+                    "task_ids": [str(item) for item in task_ids],
+                    "converted_at": converted_at,
+                    "plan_digest": plan_digest,
+                },
+                expected_version=expected_event_version,
+                idempotency_key=f"OrderTasksHandedOff:{order_id}:{plan_digest}",
+            )
             next_version = current_version + 1
             connection.execute(
                 """
