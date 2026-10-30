@@ -41,6 +41,7 @@ class PersistedOrderHandoff:
     converted_at: str
     plan_digest: str
     snapshot_version: int
+    evidence_digest: str
     created: bool
 
 
@@ -76,6 +77,17 @@ class SQLiteWorkforceRepository:
                     converted_at TEXT NOT NULL,
                     plan_digest TEXT NOT NULL,
                     snapshot_version INTEGER NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS order_acceptance_evidence (
+                    order_id TEXT PRIMARY KEY,
+                    evidence_json TEXT NOT NULL,
+                    evidence_digest TEXT NOT NULL,
+                    recorded_at TEXT NOT NULL,
+                    FOREIGN KEY(order_id) REFERENCES order_handoffs(order_id)
                 )
                 """
             )
@@ -207,8 +219,9 @@ class SQLiteWorkforceRepository:
         task_ids: tuple[UUID, ...],
         converted_at: str,
         plan_digest: str,
+        acceptance_evidence: dict[str, Any],
     ) -> PersistedOrderHandoff:
-        """Commit workforce snapshot, handoff record, and event atomically."""
+        """Commit snapshot, acceptance evidence, handoff record, and event atomically."""
         if expected_version < 0 or expected_event_version < 0:
             raise ValueError("expected versions cannot be negative")
         if not task_ids:
@@ -222,6 +235,11 @@ class SQLiteWorkforceRepository:
         )
         digest = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
         task_ids_json = json.dumps([str(item) for item in task_ids])
+        evidence_json = json.dumps(
+            acceptance_evidence, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+        evidence_digest = hashlib.sha256(evidence_json.encode("utf-8")).hexdigest()
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -230,9 +248,15 @@ class SQLiteWorkforceRepository:
                 (str(order_id),),
             ).fetchone()
             if existing is not None:
+                evidence_row = connection.execute(
+                    "SELECT evidence_digest FROM order_acceptance_evidence WHERE order_id = ?",
+                    (str(order_id),),
+                ).fetchone()
                 same_request = (
                     existing["proposal_id"] == str(proposal_id)
                     and existing["plan_digest"] == plan_digest
+                    and evidence_row is not None
+                    and evidence_row["evidence_digest"] == evidence_digest
                 )
                 if not same_request:
                     raise SnapshotConflict(
@@ -248,6 +272,7 @@ class SQLiteWorkforceRepository:
                     converted_at=existing["converted_at"],
                     plan_digest=existing["plan_digest"],
                     snapshot_version=existing["snapshot_version"],
+                    evidence_digest=evidence_digest,
                     created=False,
                 )
 
@@ -271,6 +296,7 @@ class SQLiteWorkforceRepository:
                     "task_ids": [str(item) for item in task_ids],
                     "converted_at": converted_at,
                     "plan_digest": plan_digest,
+                    "acceptance_evidence_digest": evidence_digest,
                 },
                 expected_version=expected_event_version,
                 idempotency_key=f"OrderTasksHandedOff:{order_id}:{plan_digest}",
@@ -304,6 +330,16 @@ class SQLiteWorkforceRepository:
                     next_version,
                 ),
             )
+            connection.execute(
+                """
+                INSERT INTO order_acceptance_evidence (
+                    order_id, evidence_json, evidence_digest, recorded_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    str(order_id), evidence_json, evidence_digest, converted_at,
+                ),
+            )
             connection.commit()
             return PersistedOrderHandoff(
                 order_id=order_id,
@@ -312,6 +348,7 @@ class SQLiteWorkforceRepository:
                 converted_at=converted_at,
                 plan_digest=plan_digest,
                 snapshot_version=next_version,
+                evidence_digest=evidence_digest,
                 created=True,
             )
         except Exception:
