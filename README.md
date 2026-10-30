@@ -127,7 +127,7 @@ The Sovereign Reserve is a separate trust domain. Agents may contribute to it on
 
 **Stage: Architecture / Foundation**
 
-The repository contains foundational domain and policy interfaces, sandbox financial flows, audit and reserve boundaries, an autonomous treasury decision cycle, an isolated proposal-only external strategy protocol, an initial in-memory workforce coordination core with deterministic assignment and independent review gates, and an initial in-memory commercial qualification core with conservative economics and owner approval for proposal drafts. Persistent storage, isolated worker execution, marketplace connectors, outbound proposal submission, real financial rails, and autonomous resource acquisition are not yet implemented. The new workforce and commercial tests have been added but have not been executed in this change.
+The repository contains foundational domain and policy interfaces, sandbox financial flows, audit and reserve boundaries, an autonomous treasury decision cycle, an isolated proposal-only external strategy protocol, an initial in-memory workforce coordination core with deterministic assignment and independent review gates, an initial in-memory commercial qualification core with conservative economics and owner approval for proposal drafts, and an order handoff bridge that converts customer-accepted, owner-approved orders into bounded workforce task graphs. Persistent storage, isolated worker execution, marketplace connectors, outbound proposal submission, real financial rails, and autonomous resource acquisition are not yet implemented. CI validation is tracked in GitHub Actions.
 
 ## Roadmap
 
