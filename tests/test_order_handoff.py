@@ -325,3 +325,34 @@ def test_order_approver_must_match_proposal_approver():
 
     with pytest.raises(OrderHandoffError, match="does not match"):
         OrderToWorkforceBridge().convert(order, proposal, _specs(), _workforce())
+
+
+
+def test_persistent_order_id_rejects_changed_acceptance_evidence(tmp_path):
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    database = tmp_path / "ownera.sqlite3"
+    proposal = _proposal()
+    order = _order(proposal)
+    workforce = PersistentWorkforce(database)
+    OrderToWorkforceBridge().convert(order, proposal, _specs(), workforce)
+
+    changed_order = _order(
+        proposal,
+        order_id=order.order_id,
+        customer_acceptance_ref="contract:sha256:different",
+    )
+    restarted = PersistentWorkforce(database)
+    with pytest.raises(OrderHandoffError, match="registration failed"):
+        OrderToWorkforceBridge().convert(
+            changed_order, proposal, _specs(), restarted
+        )
+
+    assert len(restarted.tasks) == 2
+    assert len(restarted.repository.event_store.load("workforce", "primary")) == 1
+    assert (
+        restarted.repository.load_order_acceptance_evidence(order.order_id)[
+            "customer_acceptance_reference"
+        ]
+        == order.customer_acceptance_ref
+    )
