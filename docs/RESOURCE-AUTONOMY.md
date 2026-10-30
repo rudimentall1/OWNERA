@@ -2,6 +2,10 @@
 
 Status: strategic architecture proposal. This document defines the direction; it does not claim that autonomous resource acquisition or profit generation is implemented.
 
+## Related market research
+
+See [Resource Intelligence Market Research](RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the competitor map, source landscape, jurisdiction analysis, opportunity hypotheses, MVP proposal, risks, and validation backlog. This is research, not implemented functionality.
+
 ## Purpose
 
 OWNERA is intended to become an owner-directed autonomous treasury and agent operating system. In addition to protecting and managing assets already provided by the owner, it should help discover, earn, obtain, allocate, and account for resources needed to carry out the owner's goals.
