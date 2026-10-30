@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -15,7 +16,7 @@ from ownera.workforce import TaskStatus, WorkerProfile, WorkforceEngine
 
 def _proposal(status=ProposalStatus.APPROVED_FOR_SUBMISSION):
     return ProposalDraft(
-        opportunity_id=__import__("uuid").uuid4(),
+        opportunity_id=uuid4(),
         scope="Build and test a bounded API integration.",
         acceptance_criteria=("API works", "Tests pass"),
         delivery_plan=("Implement", "Review", "Handover"),
@@ -36,7 +37,7 @@ def _order(proposal, **overrides):
         "customer_acceptance_ref": "contract:sha256:abc123",
         "customer_accepted_at": datetime.now(timezone.utc) - timedelta(hours=1),
         "owner_approved_by": "owner-1",
-        "owner_approved_at": datetime.now(timezone.utc) - timedelta(hours=3),
+        "owner_approved_at": datetime.now(timezone.utc) - timedelta(hours=1, minutes=30),
         "execution_budget_limit": Decimal("600"),
     }
     values.update(overrides)
