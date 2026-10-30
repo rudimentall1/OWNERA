@@ -27,7 +27,7 @@ Each task receives a new container with:
 - bounded tmpfs workspace and temporary directory;
 - a read-only bind mount containing only task input files;
 - no host home, project checkout, Docker socket, credentials, or writable host directory mounted into the container;
-- no environment variables other than a fixed PATH;
+- no caller or host environment variables are forwarded; PATH is explicitly set. Environment declared inside the pinned image remains part of the trusted image;
 - bounded captured output and explicitly requested artifacts only.
 
 The writable workspace and temporary directory are container tmpfs mounts. Artifacts are copied out only after the container exits. The container is removed in a cleanup path.
