@@ -110,6 +110,13 @@ class OrderToWorkforceBridge:
         self._trusted_keys = trusted_keys
         self._require_verified_acceptance = require_verified_acceptance
 
+    @classmethod
+    def strict(
+        cls, trusted_keys: TrustedCustomerKeyRegistry,
+    ) -> "OrderToWorkforceBridge":
+        """Construct a bridge that fails closed without a valid trusted signature."""
+        return cls(trusted_keys=trusted_keys, require_verified_acceptance=True)
+
     @property
     def handoffs(self) -> tuple[OrderHandoff, ...]:
         return tuple(self._handoffs.values())
