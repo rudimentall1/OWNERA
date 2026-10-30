@@ -262,6 +262,119 @@ class CommercialEngine:
         self._proposals[proposal_id] = approved
         return approved
 
+    def to_snapshot(self) -> dict[str, object]:
+        def dt(value):
+            return value.isoformat() if value is not None else None
+
+        return {
+            "schema_version": 1,
+            "opportunities": [
+                {**{key: getattr(item, key) for key in (
+                    "title", "description", "source_name", "source_url", "currency"
+                )},
+                 "opportunity_id": str(item.opportunity_id),
+                 "budget_min": str(item.budget_min), "budget_max": str(item.budget_max),
+                 "required_capabilities": sorted(item.required_capabilities),
+                 "evidence_refs": list(item.evidence_refs),
+                 "discovered_at": dt(item.discovered_at), "deadline": dt(item.deadline),
+                 "status": item.status.value}
+                for item in self._opportunities.values()
+            ],
+            "assessments": [
+                {"opportunity_id": str(x.opportunity_id),
+                 "estimated_delivery_cost": str(x.estimated_delivery_cost),
+                 "platform_fee_rate": str(x.platform_fee_rate),
+                 "contingency_rate": str(x.contingency_rate),
+                 "win_probability": str(x.win_probability),
+                 "minimum_net_margin": str(x.minimum_net_margin),
+                 "terms_reviewed": x.terms_reviewed,
+                 "eligibility_confirmed": x.eligibility_confirmed,
+                 "assessed_at": dt(x.assessed_at)}
+                for x in self._assessments.values()
+            ],
+            "results": [
+                {"opportunity_id": str(x.opportunity_id), "status": x.status.value,
+                 "conservative_revenue": str(x.conservative_revenue),
+                 "estimated_total_cost": str(x.estimated_total_cost),
+                 "expected_net_profit": str(x.expected_net_profit),
+                 "expected_net_margin": str(x.expected_net_margin),
+                 "risk_adjusted_value": str(x.risk_adjusted_value),
+                 "reasons": list(x.reasons)}
+                for x in self._results.values()
+            ],
+            "proposals": [
+                {"proposal_id": str(x.proposal_id), "opportunity_id": str(x.opportunity_id),
+                 "scope": x.scope, "acceptance_criteria": list(x.acceptance_criteria),
+                 "delivery_plan": list(x.delivery_plan), "quote_amount": str(x.quote_amount),
+                 "currency": x.currency, "status": x.status.value,
+                 "owner_approved_by": x.owner_approved_by,
+                 "owner_approved_at": dt(x.owner_approved_at)}
+                for x in self._proposals.values()
+            ],
+        }
+
+    @classmethod
+    def from_snapshot(cls, payload: dict[str, object]) -> CommercialEngine:
+        if payload.get("schema_version") != 1:
+            raise ValueError("unsupported commercial snapshot schema")
+        def dt(value):
+            return datetime.fromisoformat(value) if value is not None else None
+        engine = cls()
+        for x in payload["opportunities"]:
+            item = CommercialOpportunity(
+                opportunity_id=UUID(x["opportunity_id"]), title=x["title"],
+                description=x["description"], source_name=x["source_name"],
+                source_url=x["source_url"], budget_min=Decimal(x["budget_min"]),
+                budget_max=Decimal(x["budget_max"]), currency=x["currency"],
+                required_capabilities=frozenset(x["required_capabilities"]),
+                evidence_refs=tuple(x["evidence_refs"]),
+                discovered_at=dt(x["discovered_at"]), deadline=dt(x["deadline"]),
+                status=OpportunityStatus(x["status"]),
+            )
+            engine.add_opportunity(item)
+        for x in payload["assessments"]:
+            item = CommercialAssessment(
+                opportunity_id=UUID(x["opportunity_id"]),
+                estimated_delivery_cost=Decimal(x["estimated_delivery_cost"]),
+                platform_fee_rate=Decimal(x["platform_fee_rate"]),
+                contingency_rate=Decimal(x["contingency_rate"]),
+                win_probability=Decimal(x["win_probability"]),
+                minimum_net_margin=Decimal(x["minimum_net_margin"]),
+                terms_reviewed=x["terms_reviewed"],
+                eligibility_confirmed=x["eligibility_confirmed"],
+                assessed_at=dt(x["assessed_at"]),
+            )
+            engine._assessments[item.opportunity_id] = item
+        for x in payload["results"]:
+            item = QualificationResult(
+                opportunity_id=UUID(x["opportunity_id"]),
+                status=OpportunityStatus(x["status"]),
+                conservative_revenue=Decimal(x["conservative_revenue"]),
+                estimated_total_cost=Decimal(x["estimated_total_cost"]),
+                expected_net_profit=Decimal(x["expected_net_profit"]),
+                expected_net_margin=Decimal(x["expected_net_margin"]),
+                risk_adjusted_value=Decimal(x["risk_adjusted_value"]),
+                reasons=tuple(x["reasons"]),
+            )
+            engine._results[item.opportunity_id] = item
+        for x in payload["proposals"]:
+            item = ProposalDraft(
+                proposal_id=UUID(x["proposal_id"]), opportunity_id=UUID(x["opportunity_id"]),
+                scope=x["scope"], acceptance_criteria=tuple(x["acceptance_criteria"]),
+                delivery_plan=tuple(x["delivery_plan"]), quote_amount=Decimal(x["quote_amount"]),
+                currency=x["currency"], status=ProposalStatus(x["status"]),
+                owner_approved_by=x["owner_approved_by"],
+                owner_approved_at=dt(x["owner_approved_at"]),
+            )
+            engine._proposals[item.proposal_id] = item
+        if set(engine._assessments) != set(engine._results):
+            raise ValueError("commercial assessment/result references are inconsistent")
+        if any(key not in engine._opportunities for key in engine._assessments):
+            raise ValueError("assessment references unknown opportunity")
+        if any(x.opportunity_id not in engine._opportunities for x in engine._proposals.values()):
+            raise ValueError("proposal references unknown opportunity")
+        return engine
+
     def _get_opportunity(self, opportunity_id: UUID) -> CommercialOpportunity:
         try:
             return self._opportunities[opportunity_id]
