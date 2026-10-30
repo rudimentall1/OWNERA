@@ -13,7 +13,13 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from ownera.acceptance import (\n    AcceptanceVerificationError,\n    CustomerAcceptanceAttestation,\n    TrustedCustomerKeyRegistry,\n    verify_customer_acceptance,\n)\nfrom ownera.commercial import ProposalDraft, ProposalStatus
+from ownera.acceptance import (
+    AcceptanceVerificationError,
+    CustomerAcceptanceAttestation,
+    TrustedCustomerKeyRegistry,
+    verify_customer_acceptance,
+)
+from ownera.commercial import ProposalDraft, ProposalStatus
 from ownera.workforce import WorkforceEngine, WorkTask
 
 
