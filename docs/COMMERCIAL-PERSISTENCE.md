@@ -7,7 +7,7 @@ Persist OWNERA's opportunity qualification and proposal approval pipeline across
 ## Components
 
 - `CommercialEngine.to_snapshot()` and `from_snapshot()` serialize and restore opportunities, assessments, qualification results, proposals, and owner-approval metadata.
-- `SQLiteCommercialRepository` stores a complete canonical JSON snapshot in SQLite with a monotonically increasing version and SHA-256 integrity digest.
+- `SQLiteCommercialRepository` stores a complete canonical JSON snapshot in SQLite with a monotonically increasing version and SHA-256 integrity digest. It commits the snapshot and its append-only event in the same SQLite transaction.
 - `PersistentCommercialEngine` persists each successful domain transition and restores the last committed state after a stale-writer conflict or failed operation.
 
 ## Guarantees
@@ -23,7 +23,7 @@ Persist OWNERA's opportunity qualification and proposal approval pipeline across
 
 - The repository stores one complete commercial snapshot. It is suitable for the current single-owner MVP, not high-throughput multi-tenant operation.
 - The digest detects accidental or unauthorized payload modification when the stored digest is not also replaced. It is not a cryptographic signature or tamper-proof audit log.
-- Snapshot persistence is not yet integrated with the append-only event store.
+- The commercial snapshot and event are transactionally coupled. Workforce and order-handoff transitions are not yet fully coupled to the event store.
 - Commercial and workforce/order state are separate repository concerns. Cross-domain atomicity is currently implemented for order handoff plus workforce snapshot, not for every commercial-to-order transition.
 - No source scraping, external customer messaging, proposal submission, contract signing, invoicing, payment collection, settlement verification, tax calculation, or realized P&L ledger exists.
 - A proposal approval is permission to submit a proposal, not proof it was submitted, accepted, contracted, delivered, or paid.
