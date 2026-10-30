@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 authors = [
   { name = "rudimentall1" }
 ]
-dependencies = []
+dependencies = ["cryptography>=43"]
 
 [project.optional-dependencies]
 dev = [
