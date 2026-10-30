@@ -7,7 +7,7 @@ must be isolated and all external actions remain behind OWNERA policy controls.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
@@ -72,7 +72,9 @@ class WorkTask:
             raise ValueError("budget_limit cannot be negative")
         if not self.currency.strip():
             raise ValueError("currency is required")
-        if not self.acceptance_criteria or any(not item.strip() for item in self.acceptance_criteria):
+        if not self.acceptance_criteria or any(
+            not item.strip() for item in self.acceptance_criteria
+        ):
             raise ValueError("non-empty acceptance criteria are required")
         if self.task_id in self.dependencies:
             raise ValueError("task cannot depend on itself")
@@ -202,7 +204,11 @@ class WorkforceEngine:
         if task.status is not TaskStatus.READY_FOR_REVIEW:
             raise WorkforceError("task is not ready for review")
         reviewer = self._workers.get(reviewer_id)
-        if reviewer is None or not reviewer.enabled or "quality.review" not in reviewer.capabilities:
+        if (
+            reviewer is None
+            or not reviewer.enabled
+            or "quality.review" not in reviewer.capabilities
+        ):
             raise WorkforceError("reviewer lacks the quality.review capability")
         if reviewer_id == task.assigned_worker_id:
             raise WorkforceError("worker cannot review its own work")
@@ -234,11 +240,10 @@ class WorkforceEngine:
             1
             for task in self._tasks.values()
             if task.assigned_worker_id == worker_id
-            and task.status in (TaskStatus.ASSIGNED, TaskStatus.IN_PROGRESS, TaskStatus.READY_FOR_REVIEW)
+            and task.status
+            in (TaskStatus.ASSIGNED, TaskStatus.IN_PROGRESS, TaskStatus.READY_FOR_REVIEW)
         )
 
     @staticmethod
     def _replace(task: WorkTask, **changes: object) -> WorkTask:
-        from dataclasses import replace
-
         return replace(task, **changes)
