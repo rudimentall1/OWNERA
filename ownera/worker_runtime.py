@@ -16,7 +16,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Mapping
+from typing import Mapping, Protocol
 from uuid import uuid4
 
 
@@ -107,6 +107,14 @@ def _safe_relative_path(value: str) -> PurePosixPath:
     return PurePosixPath(value)
 
 
+class WorkerRuntime(Protocol):
+    """Provider-neutral contract for bounded task execution."""
+
+    def execute(self, request: WorkerExecutionRequest) -> WorkerExecutionResult:
+        """Execute one task and return bounded output and artifacts."""
+        ...
+
+
 class DockerWorkerRuntime:
     """Runs one task in a network-isolated, resource-bounded Docker container.
 
@@ -148,11 +156,15 @@ class DockerWorkerRuntime:
             input_root = Path(input_dir)
             self._stage_inputs(input_root, request.input_files)
             args = self._container_args(docker, container_name, input_root, request.command)
-            status, exit_code, stdout, stderr = self._run_container(
-                args, container_name, self.limits.wall_seconds
-            )
+            status = "FAILED"
+            exit_code = None
+            stdout = b""
+            stderr = b""
             artifacts: dict[str, bytes] = {}
             try:
+                status, exit_code, stdout, stderr = self._run_container(
+                    args, container_name, self.limits.wall_seconds
+                )
                 if status == "SUCCEEDED":
                     artifacts = self._collect_artifacts(
                         docker, container_name, request.artifact_paths
@@ -255,6 +267,14 @@ class DockerWorkerRuntime:
             except subprocess.TimeoutExpired:
                 self._kill_process_group(process)
                 process.wait(timeout=2)
+        except BaseException:
+            self._kill_process_group(process)
+            self._stop_container(self._resolve_docker(), container_name)
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self._kill_process_group(process)
+            raise
         finally:
             selector.close()
             for stream in (process.stdout, process.stderr):
