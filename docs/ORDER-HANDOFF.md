@@ -1,6 +1,6 @@
 # OWNERA Order-to-Workforce Handoff
 
-**Status:** Deterministic bridge implemented with atomic task-graph registration. The handoff registry itself remains in memory; no durable order idempotency, customer verification provider, contract-signature verification, task execution, or payment integration is implemented.  
+**Status:** Deterministic bridge implemented with atomic task-graph registration. The persistent adapter now stores the order-to-handoff record and the workforce snapshot in the same SQLite transaction. The in-memory-only fallback remains process-local. Customer verification, contract-signature verification, task execution, and payment integration are not implemented.  
 **Code:** `ownera/order_handoff.py`  
 **Tests:** `tests/test_order_handoff.py`
 
@@ -43,11 +43,11 @@ A task plan is an ordered tuple of `TaskSpec` entries. Each task defines:
 
 Dependencies must refer only to earlier tasks, which prevents cycles in this initial ordered-plan format. The sum of task budgets must not exceed the order's approved execution budget.
 
-Tasks are created as `PLANNED`. When used with `PersistentWorkforce`, the complete task graph is committed as one versioned SQLite snapshot. The workforce batch operation validates all IDs and dependencies before mutating state, so invalid batches cannot leave a partial graph. The bridge does not assign workers, start execution, contact customers, deploy code, or deliver work.
+Tasks are created as `PLANNED`. When used with `PersistentWorkforce`, the complete task graph and unique order record are committed in one SQLite transaction. The batch operation validates all IDs and dependencies before mutating state. A retry after process restart with the same order, proposal and task plan returns the original task IDs rather than creating duplicate work. Reusing an order ID with a different proposal or task plan is rejected. The bridge does not assign workers, start execution, contact customers, deploy code, or deliver work.
 
 ## Idempotency
 
-The bridge records converted order IDs in memory and rejects a second conversion of the same order during the current process. The task graph is persisted atomically when the bridge receives a `PersistentWorkforce`, but the order-to-handoff association is not yet committed in the same database transaction. After a process restart, the same order could therefore be converted again. Durable order idempotency and a transaction spanning order registration plus workforce snapshot creation remain mandatory before production use.
+When supplied a `PersistentWorkforce`, the bridge computes a deterministic digest of the accepted task plan and stores it with the order ID, proposal ID, generated task IDs and conversion timestamp. The unique order ID, task graph snapshot and handoff record are committed together. A repeated identical request returns the original handoff. A conflicting reuse of the order ID is rejected. With a plain in-memory `WorkforceEngine`, duplicate protection remains process-local.
 
 ## Next gates
 
