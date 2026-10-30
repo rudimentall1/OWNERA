@@ -104,6 +104,7 @@ class PersistentWorkforce:
         proposal_id: UUID,
         converted_at: str,
         plan_digest: str,
+        acceptance_evidence: dict,
     ) -> PersistedOrderHandoff:
         """Atomically persist a task graph and order idempotency record."""
         try:
@@ -117,6 +118,7 @@ class PersistentWorkforce:
                 task_ids=tuple(task.task_id for task in tasks),
                 converted_at=converted_at,
                 plan_digest=plan_digest,
+                acceptance_evidence=acceptance_evidence,
             )
             if record.created:
                 self._version = record.snapshot_version
