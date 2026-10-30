@@ -113,7 +113,7 @@ class OrderToWorkforceBridge:
     @classmethod
     def strict(
         cls, trusted_keys: TrustedCustomerKeyRegistry,
-    ) -> "OrderToWorkforceBridge":
+    ) -> OrderToWorkforceBridge:
         """Construct a bridge that fails closed without a valid trusted signature."""
         return cls(trusted_keys=trusted_keys, require_verified_acceptance=True)
 
