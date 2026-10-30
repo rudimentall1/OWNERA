@@ -112,14 +112,19 @@ def test_proposal_requires_qualified_opportunity_and_owner_approval():
     pending = engine.draft_proposal(proposal)
     assert pending.status is ProposalStatus.AWAITING_OWNER_APPROVAL
 
+    unqualified = _opportunity()
+    engine.add_opportunity(unqualified)
+    engine.assess(
+        _assessment(unqualified, terms_reviewed=False)
+    )
     with pytest.raises(CommercialError, match="only qualified"):
         engine.draft_proposal(
             ProposalDraft(
-                opportunity_id=_opportunity().opportunity_id,
+                opportunity_id=unqualified.opportunity_id,
                 scope="Invalid",
                 acceptance_criteria=("Done",),
                 delivery_plan=("Build",),
-                quote_amount=Decimal("100"),
+                quote_amount=Decimal("600"),
                 currency="RUB",
             )
         )
