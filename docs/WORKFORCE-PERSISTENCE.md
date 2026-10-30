@@ -12,7 +12,7 @@ The repository stores a complete versioned snapshot of worker profiles, task def
 
 A persistent order handoff stores a canonical evidence record containing the customer reference, accepted amount and currency, accepted scope and criteria, customer acceptance timestamp, owner approver and approval timestamp, execution budget, and order/proposal identifiers. The SHA-256 digest is included in the `OrderTasksHandedOff` event and the evidence row is committed in the same SQLite transaction as the task graph and idempotency record. Replaying an order requires the same evidence digest. Evidence reads recompute and verify the digest.
 
-The customer acceptance reference is retained as supplied; this layer does not independently authenticate a signature, contract, payment, or customer identity. The digest proves that the stored record has not changed relative to its recorded digest, not that the underlying claim is true.
+The customer acceptance reference is retained as supplied. An optional Ed25519 layer verifies signatures against an owner-enrolled customer key and binds the signature to customer ID, order/proposal IDs, amount, currency, accepted scope, criteria, timestamp, and nonce. A key supplied by the customer in the attestation is never trusted automatically. The current registry is in-memory; durable enrollment, authenticated administration, key rotation, and revocation audit remain production gates. Default bridge mode preserves legacy handoffs but marks their evidence UNVERIFIED. Strict mode rejects missing or unverified attestations. A valid signature proves control of an enrolled key over the signed payload, not payment settlement or legal authority unless the enrollment process established that authority.
 
 ## Atomic lifecycle events
 
