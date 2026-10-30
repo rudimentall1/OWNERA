@@ -12,10 +12,8 @@ from ownera.commercial import (
     ProposalDraft,
     QualificationResult,
 )
-from ownera.commercial_repository import (
-    CommercialSnapshotConflict,
-    SQLiteCommercialRepository,
-)
+from ownera.commercial_repository import SQLiteCommercialRepository
+
 
 
 class PersistentCommercialEngine:
