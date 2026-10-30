@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import sqlite3
 from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -11,13 +12,16 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from ownera.acceptance import (
-    AcceptanceVerificationError, CustomerAcceptanceAttestation,
-    TrustedCustomerKeyRegistry, acceptance_signing_payload,
+    AcceptanceVerificationError,
+    CustomerAcceptanceAttestation,
+    TrustedCustomerKeyRegistry,
+    TrustedKeyRegistryError,
+    acceptance_signing_payload,
     verify_customer_acceptance,
 )
 from ownera.commercial import ProposalDraft, ProposalStatus
 from ownera.order_handoff import CustomerOrder, OrderHandoffError, OrderToWorkforceBridge, TaskSpec
-from ownera.workforce import WorkforceEngine, WorkerProfile
+from ownera.workforce import WorkerProfile, WorkforceEngine
 
 
 def _signed_order():
@@ -104,8 +108,6 @@ def test_invalid_signature_is_rejected_before_handoff():
 
 
 def test_registry_survives_restart_and_audit_chain_verifies(tmp_path):
-    from ownera.acceptance import TrustedCustomerKeyRegistry
-
     _, order, registry, _, _ = _signed_order()
     key = registry.get_active("customer-1", "key-1")
     database = tmp_path / "trusted-keys.sqlite3"
@@ -191,9 +193,6 @@ def test_key_rotation_rolls_back_if_replacement_id_already_exists(tmp_path):
 
 
 def test_audit_chain_detects_modified_event(tmp_path):
-    import sqlite3
-    from ownera.acceptance import TrustedCustomerKeyRegistry, TrustedKeyRegistryError
-
     database = tmp_path / "audit-tamper.sqlite3"
     registry = TrustedCustomerKeyRegistry(database)
     public = Ed25519PrivateKey.generate().public_key().public_bytes(
@@ -215,9 +214,6 @@ def test_audit_chain_detects_modified_event(tmp_path):
 
 
 def test_registry_detects_key_table_tampering(tmp_path):
-    import sqlite3
-    from ownera.acceptance import TrustedCustomerKeyRegistry, TrustedKeyRegistryError
-
     database = tmp_path / "key-row-tamper.sqlite3"
     registry = TrustedCustomerKeyRegistry(database)
     public = Ed25519PrivateKey.generate().public_key().public_bytes(
