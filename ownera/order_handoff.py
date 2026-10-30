@@ -26,6 +26,8 @@ class CustomerOrder:
     accepted_amount: Decimal
     currency: str
     customer_acceptance_ref: str
+    accepted_scope: str
+    accepted_acceptance_criteria: tuple[str, ...]
     customer_accepted_at: datetime
     owner_approved_by: str
     owner_approved_at: datetime
@@ -41,6 +43,8 @@ class CustomerOrder:
             raise ValueError("currency must be a three-letter code")
         if not self.customer_acceptance_ref.strip():
             raise ValueError("customer acceptance evidence is required")
+        if not self.accepted_scope.strip() or not self.accepted_acceptance_criteria:
+            raise ValueError("customer-accepted scope and acceptance criteria are required")
         if not self.owner_approved_by.strip():
             raise ValueError("owner approval is required")
         if self.execution_budget_limit < 0:
@@ -116,6 +120,12 @@ class OrderToWorkforceBridge:
             raise OrderHandoffError("order currency does not match proposal")
         if order.accepted_amount != proposal.quote_amount:
             raise OrderHandoffError("customer acceptance amount differs from approved quote")
+        if order.accepted_scope != proposal.scope:
+            raise OrderHandoffError("customer-accepted scope differs from approved proposal")
+        if order.accepted_acceptance_criteria != proposal.acceptance_criteria:
+            raise OrderHandoffError(
+                "customer-accepted criteria differ from approved proposal"
+            )
         if order.owner_approved_at < proposal.owner_approved_at:
             raise OrderHandoffError("order approval predates proposal approval")
         if not task_specs:
@@ -150,13 +160,13 @@ class OrderToWorkforceBridge:
                 )
             )
 
-        # All order and task-plan validations run before mutating the workforce.
-        for task in tasks:
-            workforce.add_task(task)
-
         converted_at = now or datetime.now(timezone.utc)
         if converted_at.tzinfo is None:
             raise ValueError("conversion timestamp must be timezone-aware")
+
+        # All order and task-plan validations run before mutating the workforce.
+        for task in tasks:
+            workforce.add_task(task)
         handoff = OrderHandoff(
             order_id=order.order_id,
             proposal_id=proposal.proposal_id,
