@@ -14,7 +14,7 @@ The long-term goal is an owner-controlled agent operation that can find useful w
 
 The agent is powerful by design, but its authority and execution are constrained by deterministic security and policy controls.
 
-See [Resource Autonomy](docs/RESOURCE-AUTONOMY.md) for the Resource Autonomy Engine direction, [Commercial Engine](docs/COMMERCIAL-ENGINE.md) for opportunity qualification and owner-approved proposals, [Workforce Engine](docs/WORKFORCE-ENGINE.md) for task coordination, and [Resource Intelligence research](docs/RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the unclaimed-resource market investigation.
+See [Resource Autonomy](docs/RESOURCE-AUTONOMY.md) for the Resource Autonomy Engine direction, [Commercial Engine](docs/COMMERCIAL-ENGINE.md) for opportunity qualification and owner-approved proposals, [Order-to-Workforce Handoff](docs/ORDER-HANDOFF.md) for customer-approved order conversion, [Workforce Engine](docs/WORKFORCE-ENGINE.md) for task coordination, and [Resource Intelligence research](docs/RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the unclaimed-resource market investigation.
 
 ## Core Principles
 
