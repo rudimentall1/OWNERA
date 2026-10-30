@@ -56,12 +56,12 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Persist workforce transitions automatically through a versioned SQLite facade
 - [x] Validate and persist complete workforce task graphs as one snapshot during handoff
 - [x] Persist order idempotency, proposal reference, plan digest and task graph in one SQLite transaction
-- [ ] Integrate persistent repositories and state restoration for commercial and order aggregates
+- [x] Add versioned SQLite commercial snapshot repository and automatic persistence facade
 - [x] Persist workforce state with restart recovery and optimistic concurrency
 - [ ] Integrate append-only transition evidence with the workforce repository
 - [x] Define initial commercial opportunity qualification and owner-approved proposal draft lifecycle
 - [x] Define customer-accepted, owner-approved order handoff into bounded workforce task graphs
-- [ ] Persist commercial and workforce state with append-only transition evidence
+- [ ] Integrate append-only transition evidence with commercial, order and workforce persistence
 - [ ] Select one narrow service with measurable demand and delivery criteria
 - [ ] Define isolated execution environments and bounded worker runtimes
 - [ ] Add permitted source adapters and discover real paid work
