@@ -63,6 +63,8 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Define customer-accepted, owner-approved order handoff into bounded workforce task graphs
 - [x] Couple commercial snapshot writes with append-only hash-chained events in one SQLite transaction
 - [x] Couple order-handoff persistence with append-only events in one SQLite transaction
+- [x] Persist customer and owner acceptance evidence with digest binding in the order handoff transaction
+- [ ] Verify customer acceptance evidence against a trusted signature or contract source
 - [ ] Select one narrow service with measurable demand and delivery criteria
 - [ ] Define isolated execution environments and bounded worker runtimes
 - [ ] Add permitted source adapters and discover real paid work
