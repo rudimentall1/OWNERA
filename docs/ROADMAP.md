@@ -61,7 +61,8 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Integrate append-only transition evidence with the workforce repository
 - [x] Define initial commercial opportunity qualification and owner-approved proposal draft lifecycle
 - [x] Define customer-accepted, owner-approved order handoff into bounded workforce task graphs
-- [ ] Integrate append-only transition evidence with commercial, order and workforce persistence
+- [x] Couple commercial snapshot writes with append-only hash-chained events in one SQLite transaction
+- [ ] Couple order-handoff and workforce lifecycle writes with append-only events in one SQLite transaction
 - [ ] Select one narrow service with measurable demand and delivery criteria
 - [ ] Define isolated execution environments and bounded worker runtimes
 - [ ] Add permitted source adapters and discover real paid work
