@@ -52,7 +52,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 
 - [x] Define initial worker/task contract and deterministic in-memory assignment/review lifecycle
 - [x] Add initial SQLite append-only event store with optimistic concurrency and hash-chain verification
-- [ ] Integrate persistent repositories and state restoration for workforce, commercial and order aggregates
+- [x] Add versioned SQLite workforce snapshot repository with restart recovery and digest verification
+- [ ] Persist workforce transitions automatically and atomically with order handoff
+- [ ] Integrate persistent repositories and state restoration for commercial and order aggregates
 - [ ] Persist workforce state and append-only transition evidence
 - [x] Define initial commercial opportunity qualification and owner-approved proposal draft lifecycle
 - [x] Define customer-accepted, owner-approved order handoff into bounded workforce task graphs
