@@ -188,3 +188,48 @@ def test_order_handoff_persists_complete_task_graph_in_one_workforce_snapshot(tm
     assert tuple(task.task_id for task in restored.tasks) == handoff.task_ids
     assert restored.tasks[1].dependencies == (restored.tasks[0].task_id,)
     assert restored.version == workforce.version
+
+
+
+def test_persistent_order_handoff_is_idempotent_across_bridge_restart(tmp_path):
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    database = tmp_path / "ownera.sqlite3"
+    proposal = _proposal()
+    order = _order(proposal)
+    first_bridge = OrderToWorkforceBridge()
+    first_workforce = PersistentWorkforce(database)
+    first = first_bridge.convert(order, proposal, _specs(), first_workforce)
+
+    second_bridge = OrderToWorkforceBridge()
+    second_workforce = PersistentWorkforce(database)
+    replay = second_bridge.convert(order, proposal, _specs(), second_workforce)
+
+    assert replay == first
+    assert tuple(task.task_id for task in second_workforce.tasks) == first.task_ids
+    assert second_workforce.version == first_workforce.version
+
+
+def test_persistent_order_id_cannot_be_reused_for_different_task_plan(tmp_path):
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    database = tmp_path / "ownera.sqlite3"
+    proposal = _proposal()
+    order = _order(proposal)
+    workforce = PersistentWorkforce(database)
+    OrderToWorkforceBridge().convert(order, proposal, _specs(), workforce)
+
+    changed_specs = (
+        TaskSpec(
+            title="Different implementation",
+            description="A materially different task plan.",
+            required_capabilities=frozenset({"python", "fastapi"}),
+            budget_limit=Decimal("400"),
+            acceptance_criteria=("Different result",),
+        ),
+    )
+    restarted = PersistentWorkforce(database)
+    with pytest.raises(OrderHandoffError, match="registration failed"):
+        OrderToWorkforceBridge().convert(order, proposal, changed_specs, restarted)
+
+    assert len(restarted.tasks) == 2
