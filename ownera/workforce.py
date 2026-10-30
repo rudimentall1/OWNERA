@@ -104,6 +104,118 @@ class WorkforceEngine:
             self.register_worker(worker)
 
     @property
+    def workers(self) -> tuple[WorkerProfile, ...]:
+        return tuple(self._workers.values())
+
+    def to_snapshot(self) -> dict[str, object]:
+        """Return a JSON-compatible representation of the complete workforce state."""
+        return {
+            "schema_version": 1,
+            "workers": [
+                {
+                    "worker_id": worker.worker_id,
+                    "role": worker.role,
+                    "capabilities": sorted(worker.capabilities),
+                    "max_concurrent_tasks": worker.max_concurrent_tasks,
+                    "enabled": worker.enabled,
+                }
+                for worker in self._workers.values()
+            ],
+            "tasks": [
+                {
+                    "task_id": str(task.task_id),
+                    "title": task.title,
+                    "description": task.description,
+                    "required_capabilities": sorted(task.required_capabilities),
+                    "budget_limit": str(task.budget_limit),
+                    "currency": task.currency,
+                    "acceptance_criteria": list(task.acceptance_criteria),
+                    "dependencies": [str(item) for item in task.dependencies],
+                    "status": task.status.value,
+                    "assigned_worker_id": task.assigned_worker_id,
+                    "actual_cost": str(task.actual_cost),
+                    "artifact_refs": list(task.artifact_refs),
+                    "result_summary": task.result_summary,
+                    "reviewer_id": task.reviewer_id,
+                }
+                for task in self._tasks.values()
+            ],
+            "reviews": [
+                {
+                    "task_id": str(review.task_id),
+                    "reviewer_id": review.reviewer_id,
+                    "accepted": review.accepted,
+                    "findings": list(review.findings),
+                    "reviewed_at": review.reviewed_at.isoformat(),
+                }
+                for review in self._reviews
+            ],
+        }
+
+    @classmethod
+    def from_snapshot(cls, snapshot: dict[str, object]) -> WorkforceEngine:
+        """Restore a workforce state after validating its schema and references."""
+        if snapshot.get("schema_version") != 1:
+            raise WorkforceError("unsupported workforce snapshot schema")
+        workers_data = snapshot.get("workers")
+        tasks_data = snapshot.get("tasks")
+        reviews_data = snapshot.get("reviews")
+        if not isinstance(workers_data, list) or not isinstance(tasks_data, list):
+            raise WorkforceError("invalid workforce snapshot collections")
+        if not isinstance(reviews_data, list):
+            raise WorkforceError("invalid workforce review collection")
+
+        workers = tuple(
+            WorkerProfile(
+                worker_id=item["worker_id"],
+                role=item["role"],
+                capabilities=frozenset(item["capabilities"]),
+                max_concurrent_tasks=item["max_concurrent_tasks"],
+                enabled=item["enabled"],
+            )
+            for item in workers_data
+        )
+        engine = cls(workers)
+        for item in tasks_data:
+            task = WorkTask(
+                task_id=UUID(item["task_id"]),
+                title=item["title"],
+                description=item["description"],
+                required_capabilities=frozenset(item["required_capabilities"]),
+                budget_limit=Decimal(item["budget_limit"]),
+                currency=item["currency"],
+                acceptance_criteria=tuple(item["acceptance_criteria"]),
+                dependencies=tuple(UUID(value) for value in item["dependencies"]),
+                status=TaskStatus(item["status"]),
+                assigned_worker_id=item["assigned_worker_id"],
+                actual_cost=Decimal(item["actual_cost"]),
+                artifact_refs=tuple(item["artifact_refs"]),
+                result_summary=item["result_summary"],
+                reviewer_id=item["reviewer_id"],
+            )
+            engine.add_task(task)
+            if task.status is not TaskStatus.PLANNED:
+                if task.assigned_worker_id not in engine._workers:
+                    raise WorkforceError("snapshot task references an unknown worker")
+                if task.status in (TaskStatus.IN_PROGRESS, TaskStatus.READY_FOR_REVIEW, TaskStatus.ACCEPTED, TaskStatus.REWORK_REQUIRED):
+                    if task.assigned_worker_id is None:
+                        raise WorkforceError("active snapshot task has no assigned worker")
+        for item in reviews_data:
+            review = TaskReview(
+                task_id=UUID(item["task_id"]),
+                reviewer_id=item["reviewer_id"],
+                accepted=item["accepted"],
+                findings=tuple(item["findings"]),
+                reviewed_at=datetime.fromisoformat(item["reviewed_at"]),
+            )
+            if review.task_id not in engine._tasks:
+                raise WorkforceError("snapshot review references an unknown task")
+            if review.reviewer_id not in engine._workers:
+                raise WorkforceError("snapshot review references an unknown reviewer")
+            engine._reviews.append(review)
+        return engine
+
+    @property
     def tasks(self) -> tuple[WorkTask, ...]:
         return tuple(self._tasks.values())
 
