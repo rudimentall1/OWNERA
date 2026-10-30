@@ -203,6 +203,14 @@ class OrderToWorkforceBridge:
             "owner_approved_by": order.owner_approved_by,
             "owner_approved_at": order.owner_approved_at.isoformat(),
             "execution_budget_limit": str(order.execution_budget_limit),
+            "customer_acceptance_attestation": (
+                {
+                    "key_id": order.acceptance_attestation.key_id,
+                    "signature_b64": order.acceptance_attestation.signature_b64,
+                    "nonce": order.acceptance_attestation.nonce,
+                }
+                if order.acceptance_attestation is not None else None
+            ),
             "acceptance_verification": (
                 {"status": acceptance_verification.status, "key_id": acceptance_verification.key_id,
                  "attestation_digest": acceptance_verification.attestation_digest,
