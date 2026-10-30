@@ -107,3 +107,113 @@ def test_invalid_signature_is_rejected_before_handoff():
             trusted_keys=registry, require_verified_acceptance=True
         ).convert(broken, proposal, specs, workforce)
 
+
+
+def test_registry_survives_restart_and_audit_chain_verifies(tmp_path):
+    from ownera.acceptance import TrustedCustomerKeyRegistry
+
+    _, order, registry, _, _ = _signed_order()
+    key = registry.get_active("customer-1", "key-1")
+    database = tmp_path / "trusted-keys.sqlite3"
+    registry.close()
+    durable = TrustedCustomerKeyRegistry(database)
+    durable.enroll(
+        "customer-1", "key-1",
+        base64.b64decode(key.public_key_b64), actor_id="security-admin",
+    )
+    assert durable.verify_audit_chain() is True
+    durable.close()
+
+    restored = TrustedCustomerKeyRegistry(database)
+    assert verify_customer_acceptance(order, restored).status == "VERIFIED"
+    events = restored.audit_events()
+    assert len(events) == 1
+    assert events[0]["actor_id"] == "security-admin"
+    assert events[0]["event_type"] == "KEY_ENROLLED"
+    assert restored.verify_audit_chain() is True
+    restored.close()
+
+
+def test_key_rotation_is_atomic_and_revokes_previous_key(tmp_path):
+    from ownera.acceptance import TrustedCustomerKeyRegistry
+
+    _, order, registry, _, _ = _signed_order()
+    old = registry.get_active("customer-1", "key-1")
+    database = tmp_path / "rotation.sqlite3"
+    registry.close()
+    durable = TrustedCustomerKeyRegistry(database)
+    durable.enroll("customer-1", "key-1", base64.b64decode(old.public_key_b64))
+    replacement_private = Ed25519PrivateKey.generate()
+    replacement_public = replacement_private.public_key().public_bytes(
+        Encoding.Raw, PublicFormat.Raw
+    )
+    durable.rotate(
+        "customer-1", "key-1", "key-2", replacement_public,
+        actor_id="security-admin",
+    )
+    with pytest.raises(AcceptanceVerificationError, match="missing or revoked"):
+        verify_customer_acceptance(order, durable)
+    replacement_order = replace(
+        order,
+        acceptance_attestation=CustomerAcceptanceAttestation("key-2", "", "nonce-2"),
+    )
+    signature = base64.b64encode(
+        replacement_private.sign(acceptance_signing_payload(replacement_order))
+    ).decode()
+    replacement_order = replace(
+        replacement_order,
+        acceptance_attestation=CustomerAcceptanceAttestation("key-2", signature, "nonce-2"),
+    )
+    assert verify_customer_acceptance(replacement_order, durable).status == "VERIFIED"
+    assert [event["event_type"] for event in durable.audit_events()] == [
+        "KEY_ENROLLED", "KEY_REVOKED", "KEY_ENROLLED"
+    ]
+    assert durable.verify_audit_chain() is True
+    durable.close()
+
+
+def test_key_rotation_rolls_back_if_replacement_id_already_exists(tmp_path):
+    from ownera.acceptance import TrustedCustomerKeyRegistry
+
+    database = tmp_path / "rotation-rollback.sqlite3"
+    registry = TrustedCustomerKeyRegistry(database)
+    first = Ed25519PrivateKey.generate().public_key().public_bytes(
+        Encoding.Raw, PublicFormat.Raw
+    )
+    second = Ed25519PrivateKey.generate().public_key().public_bytes(
+        Encoding.Raw, PublicFormat.Raw
+    )
+    registry.enroll("customer", "old", first)
+    registry.enroll("customer", "new", second)
+    before = registry.audit_events()
+    with pytest.raises(Exception):
+        registry.rotate("customer", "old", "new", second)
+    assert registry.get_active("customer", "old").active is True
+    assert registry.get_active("customer", "new").active is True
+    assert registry.audit_events() == before
+    assert registry.verify_audit_chain() is True
+    registry.close()
+
+
+def test_audit_chain_detects_modified_event(tmp_path):
+    import sqlite3
+    from ownera.acceptance import TrustedCustomerKeyRegistry, TrustedKeyRegistryError
+
+    database = tmp_path / "audit-tamper.sqlite3"
+    registry = TrustedCustomerKeyRegistry(database)
+    public = Ed25519PrivateKey.generate().public_key().public_bytes(
+        Encoding.Raw, PublicFormat.Raw
+    )
+    registry.enroll("customer", "key", public)
+    registry.close()
+    connection = sqlite3.connect(database)
+    connection.execute(
+        "UPDATE trusted_key_audit SET actor_id = ? WHERE sequence = 1",
+        ("tampered-admin",),
+    )
+    connection.commit()
+    connection.close()
+    restored = TrustedCustomerKeyRegistry(database)
+    with pytest.raises(TrustedKeyRegistryError, match="digest mismatch"):
+        restored.verify_audit_chain()
+    restored.close()
