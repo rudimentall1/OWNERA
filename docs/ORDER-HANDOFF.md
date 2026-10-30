@@ -24,10 +24,11 @@ A `CustomerOrder` requires:
 - customer reference;
 - accepted amount and currency;
 - customer acceptance evidence reference and timestamp;
+- the exact accepted scope and acceptance criteria;
 - owner approval identity and timestamp;
 - execution budget limit.
 
-The initial implementation validates that the order references the approved proposal, the accepted amount equals the proposal quote, currencies match, owner approval follows proposal approval and precedes customer acceptance, and the execution budget does not exceed accepted revenue.
+The initial implementation validates that the order references the approved proposal, the accepted amount equals the proposal quote, currencies match, the accepted scope and acceptance criteria exactly match the approved proposal, owner approval follows proposal approval and precedes customer acceptance, and the execution budget does not exceed accepted revenue.
 
 The acceptance reference is a provenance pointer. This version does not cryptographically verify a signature, authenticate the customer, or validate contract enforceability.
 
