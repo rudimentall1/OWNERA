@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 
+from ownera.event_store import ConcurrencyError, SQLiteEventStore
 from ownera.persistent_workforce import PersistentWorkforce
 from ownera.workforce import (
     TaskStatus,
@@ -9,7 +10,6 @@ from ownera.workforce import (
     WorkTask,
 )
 from ownera.workforce_repository import SnapshotConflict
-from ownera.event_store import SQLiteEventStore, ConcurrencyError
 
 
 def _task():
