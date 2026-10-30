@@ -15,7 +15,6 @@ from ownera.commercial import (
 from ownera.commercial_repository import SQLiteCommercialRepository
 
 
-
 class PersistentCommercialEngine:
     """Persists each successful commercial transition as a versioned snapshot."""
 
