@@ -1,6 +1,6 @@
 # OWNERA Order-to-Workforce Handoff
 
-**Status:** Initial deterministic in-memory bridge implemented. No persistence, customer verification provider, contract-signature verification, task execution, or payment integration is implemented.  
+**Status:** Deterministic bridge implemented with atomic task-graph registration. The handoff registry itself remains in memory; no durable order idempotency, customer verification provider, contract-signature verification, task execution, or payment integration is implemented.  
 **Code:** `ownera/order_handoff.py`  
 **Tests:** `tests/test_order_handoff.py`
 
@@ -43,11 +43,11 @@ A task plan is an ordered tuple of `TaskSpec` entries. Each task defines:
 
 Dependencies must refer only to earlier tasks, which prevents cycles in this initial ordered-plan format. The sum of task budgets must not exceed the order's approved execution budget.
 
-Tasks are created as `PLANNED`. The bridge does not assign workers, start execution, contact customers, deploy code, or deliver work.
+Tasks are created as `PLANNED`. When used with `PersistentWorkforce`, the complete task graph is committed as one versioned SQLite snapshot. The workforce batch operation validates all IDs and dependencies before mutating state, so invalid batches cannot leave a partial graph. The bridge does not assign workers, start execution, contact customers, deploy code, or deliver work.
 
 ## Idempotency
 
-The bridge records converted order IDs in memory and rejects a second conversion of the same order. This is process-local protection only. Persistent uniqueness constraints and transactional outbox handling are required before production use.
+The bridge records converted order IDs in memory and rejects a second conversion of the same order during the current process. The task graph is persisted atomically when the bridge receives a `PersistentWorkforce`, but the order-to-handoff association is not yet committed in the same database transaction. After a process restart, the same order could therefore be converted again. Durable order idempotency and a transaction spanning order registration plus workforce snapshot creation remain mandatory before production use.
 
 ## Next gates
 
