@@ -197,9 +197,17 @@ class WorkforceEngine:
             if task.status is not TaskStatus.PLANNED:
                 if task.assigned_worker_id not in engine._workers:
                     raise WorkforceError("snapshot task references an unknown worker")
-                if task.status in (TaskStatus.IN_PROGRESS, TaskStatus.READY_FOR_REVIEW, TaskStatus.ACCEPTED, TaskStatus.REWORK_REQUIRED):
-                    if task.assigned_worker_id is None:
-                        raise WorkforceError("active snapshot task has no assigned worker")
+                if (
+                    task.status
+                    in (
+                        TaskStatus.IN_PROGRESS,
+                        TaskStatus.READY_FOR_REVIEW,
+                        TaskStatus.ACCEPTED,
+                        TaskStatus.REWORK_REQUIRED,
+                    )
+                    and task.assigned_worker_id is None
+                ):
+                    raise WorkforceError("active snapshot task has no assigned worker")
         for item in reviews_data:
             review = TaskReview(
                 task_id=UUID(item["task_id"]),
