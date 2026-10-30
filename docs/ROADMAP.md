@@ -51,6 +51,8 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 ## 4 — Earned Revenue and Agent Workforce
 
 - [x] Define initial worker/task contract and deterministic in-memory assignment/review lifecycle
+- [x] Add initial SQLite append-only event store with optimistic concurrency and hash-chain verification
+- [ ] Integrate persistent repositories and state restoration for workforce, commercial and order aggregates
 - [ ] Persist workforce state and append-only transition evidence
 - [x] Define initial commercial opportunity qualification and owner-approved proposal draft lifecycle
 - [x] Define customer-accepted, owner-approved order handoff into bounded workforce task graphs
