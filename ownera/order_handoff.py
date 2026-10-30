@@ -89,6 +89,7 @@ class OrderHandoff:
     proposal_id: UUID
     task_ids: tuple[UUID, ...]
     converted_at: datetime
+    evidence_digest: str
 
 
 class OrderToWorkforceBridge:
@@ -184,6 +185,12 @@ class OrderToWorkforceBridge:
             "execution_budget_limit": str(order.execution_budget_limit),
         }
 
+        evidence_json = json.dumps(
+            acceptance_evidence, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+        evidence_digest = hashlib.sha256(evidence_json.encode("utf-8")).hexdigest()
+
         # The plan digest excludes generated task IDs so a retry after a crash
         # can resolve to the original committed task graph.
         plan_payload = [
@@ -224,6 +231,7 @@ class OrderToWorkforceBridge:
                     proposal_id=persisted.proposal_id,
                     task_ids=persisted.task_ids,
                     converted_at=datetime.fromisoformat(persisted.converted_at),
+                    evidence_digest=persisted.evidence_digest,
                 )
             else:
                 workforce.add_tasks(tuple(tasks))
@@ -232,6 +240,7 @@ class OrderToWorkforceBridge:
                     proposal_id=proposal.proposal_id,
                     task_ids=tuple(task.task_id for task in tasks),
                     converted_at=converted_at,
+                    evidence_digest=evidence_digest,
                 )
         except Exception as exc:
             raise OrderHandoffError("task graph registration failed") from exc
