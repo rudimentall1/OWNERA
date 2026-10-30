@@ -189,6 +189,8 @@ class DockerWorkerRuntime:
         return resolved
 
     def _stage_inputs(self, root: Path, files: Mapping[str, bytes]) -> None:
+        # The container runs as UID 65532; the mounted root must be traversable.
+        root.chmod(0o755)
         for name, content in files.items():
             if not isinstance(content, bytes):
                 raise WorkerRuntimeError("input file contents must be bytes")
@@ -203,7 +205,7 @@ class DockerWorkerRuntime:
     ) -> list[str]:
         limits = self.limits
         return [
-            docker, "run", "--name", name,
+            docker, "run", "--pull=never", "--name", name,
             "--network", "none",
             "--read-only",
             "--cap-drop", "ALL",
