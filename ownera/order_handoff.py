@@ -164,9 +164,12 @@ class OrderToWorkforceBridge:
         if converted_at.tzinfo is None:
             raise ValueError("conversion timestamp must be timezone-aware")
 
-        # All order and task-plan validations run before mutating the workforce.
-        for task in tasks:
-            workforce.add_task(task)
+        # Register the complete task graph in one domain operation. Persistent
+        # workforce adapters commit the full graph in one SQLite snapshot.
+        try:
+            workforce.add_tasks(tuple(tasks))
+        except Exception as exc:
+            raise OrderHandoffError("task graph registration failed") from exc
         handoff = OrderHandoff(
             order_id=order.order_id,
             proposal_id=proposal.proposal_id,
