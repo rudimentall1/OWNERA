@@ -186,7 +186,8 @@ def test_key_rotation_rolls_back_if_replacement_id_already_exists(tmp_path):
     registry.enroll("customer", "old", first)
     registry.enroll("customer", "new", second)
     before = registry.audit_events()
-    with pytest.raises(Exception):
+    import sqlite3
+    with pytest.raises(sqlite3.IntegrityError):
         registry.rotate("customer", "old", "new", second)
     assert registry.get_active("customer", "old").active is True
     assert registry.get_active("customer", "new").active is True
