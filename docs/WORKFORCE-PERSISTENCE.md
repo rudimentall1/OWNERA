@@ -8,6 +8,12 @@
 
 The repository stores a complete versioned snapshot of worker profiles, task definitions and dependencies, task lifecycle status, assignment, execution cost, artifact references, result summaries, reviewer references, and review decisions. Decimal values are serialized as strings. UUIDs and timestamps use canonical textual representations. The snapshot payload is hashed with SHA-256 and verified before restoration.
 
+## Customer acceptance evidence
+
+A persistent order handoff stores a canonical evidence record containing the customer reference, accepted amount and currency, accepted scope and criteria, customer acceptance timestamp, owner approver and approval timestamp, execution budget, and order/proposal identifiers. The SHA-256 digest is included in the `OrderTasksHandedOff` event and the evidence row is committed in the same SQLite transaction as the task graph and idempotency record. Replaying an order requires the same evidence digest. Evidence reads recompute and verify the digest.
+
+The customer acceptance reference is retained as supplied; this layer does not independently authenticate a signature, contract, payment, or customer identity. The digest proves that the stored record has not changed relative to its recorded digest, not that the underlying claim is true.
+
 ## Atomic lifecycle events
 
 The application-facing `PersistentWorkforce` facade records these transitions:
