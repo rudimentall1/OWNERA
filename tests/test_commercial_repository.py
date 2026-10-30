@@ -73,6 +73,12 @@ def test_commercial_pipeline_survives_restart(tmp_path):
     assert restored.opportunities[0].status is OpportunityStatus.QUALIFIED
     assert restored.proposals[0].status is ProposalStatus.APPROVED_FOR_SUBMISSION
     assert restored.proposals[0].owner_approved_by == "owner-1"
+    events = restored.repository.event_store.load("commercial_pipeline", "primary")
+    assert [event.event_type for event in events] == [
+        "OpportunityDiscovered", "OpportunityAssessed",
+        "ProposalDrafted", "ProposalOwnerApproved",
+    ]
+    assert restored.repository.event_store.verify("commercial_pipeline", "primary")
     assert restored.proposals[0].proposal_id == approved.proposal_id
     assert result.expected_net_profit == Decimal("265.00")
 
@@ -112,3 +118,37 @@ def test_empty_commercial_repository_starts_at_version_zero(tmp_path):
     assert engine.version == 0
     assert engine.opportunities == ()
     assert engine.proposals == ()
+
+
+
+def test_event_and_commercial_snapshot_roll_back_together_on_event_conflict(tmp_path):
+    from ownera.event_store import ConcurrencyError
+
+    database = tmp_path / "ownera.sqlite3"
+    engine = PersistentCommercialEngine(str(database))
+    opportunity = _opportunity()
+    engine.add_opportunity(opportunity)
+
+    before_snapshot = engine.version
+    before_events = len(
+        engine.repository.event_store.load("commercial_pipeline", "primary")
+    )
+    engine.repository.event_store.append(
+        aggregate_type="commercial_pipeline",
+        aggregate_id="primary",
+        event_type="ExternalUnexpectedEvent",
+        payload={"reason": "test conflict"},
+        expected_version=before_events,
+        idempotency_key="external-unexpected-event",
+    )
+
+    with pytest.raises(ConcurrencyError):
+        engine.assess(_assessment(opportunity))
+
+    restored = PersistentCommercialEngine(str(database))
+    assert restored.version == before_snapshot
+    assert len(restored.opportunities) == 1
+    assert len(
+        restored.repository.event_store.load("commercial_pipeline", "primary")
+    ) == before_events + 1
+    assert restored.opportunities[0].status is OpportunityStatus.DISCOVERED
