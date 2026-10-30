@@ -117,6 +117,21 @@ class SQLiteWorkforceRepository:
                 raise SnapshotConflict(
                     f"expected snapshot version {expected_version}, found {current_version}"
                 )
+            self.event_store.append_in_transaction(
+                connection,
+                aggregate_type="workforce",
+                aggregate_id=self.SNAPSHOT_ID,
+                event_type="OrderTasksHandedOff",
+                payload={
+                    "order_id": str(order_id),
+                    "proposal_id": str(proposal_id),
+                    "task_ids": [str(item) for item in task_ids],
+                    "converted_at": converted_at,
+                    "plan_digest": plan_digest,
+                },
+                expected_version=expected_event_version,
+                idempotency_key=f"OrderTasksHandedOff:{order_id}:{plan_digest}",
+            )
             next_version = current_version + 1
             connection.execute(
                 """
@@ -201,15 +216,16 @@ class SQLiteWorkforceRepository:
         engine: WorkforceEngine,
         *,
         expected_version: int,
+        expected_event_version: int,
         order_id: UUID,
         proposal_id: UUID,
         task_ids: tuple[UUID, ...],
         converted_at: str,
         plan_digest: str,
     ) -> PersistedOrderHandoff:
-        """Commit workforce snapshot and order idempotency record atomically."""
-        if expected_version < 0:
-            raise ValueError("expected_version cannot be negative")
+        """Commit workforce snapshot, handoff record, and event atomically."""
+        if expected_version < 0 or expected_event_version < 0:
+            raise ValueError("expected versions cannot be negative")
         if not task_ids:
             raise ValueError("at least one task ID is required")
         payload_json = json.dumps(
