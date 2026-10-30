@@ -55,18 +55,14 @@ def _signed_order():
 def test_valid_signature_and_strict_handoff():
     proposal, order, registry, workforce, specs = _signed_order()
     assert verify_customer_acceptance(order, registry).status == "VERIFIED"
-    handoff = OrderToWorkforceBridge(
-        trusted_keys=registry, require_verified_acceptance=True
-    ).convert(order, proposal, specs, workforce)
+    handoff = OrderToWorkforceBridge.strict(registry).convert(order, proposal, specs, workforce)
     assert handoff.task_ids
 
 
 def test_strict_mode_rejects_missing_attestation():
     proposal, order, registry, workforce, specs = _signed_order()
     with pytest.raises(OrderHandoffError, match="verified customer acceptance"):
-        OrderToWorkforceBridge(
-            trusted_keys=registry, require_verified_acceptance=True
-        ).convert(replace(order, acceptance_attestation=None), proposal, specs, workforce)
+        OrderToWorkforceBridge.strict(registry).convert(replace(order, acceptance_attestation=None), proposal, specs, workforce)
 
 
 def test_tampered_amount_or_scope_invalidates_signature():
@@ -103,9 +99,7 @@ def test_invalid_signature_is_rejected_before_handoff():
         "key-1", base64.b64encode(b"invalid-signature").decode(), "nonce-1"
     ))
     with pytest.raises(OrderHandoffError, match="signature is invalid"):
-        OrderToWorkforceBridge(
-            trusted_keys=registry, require_verified_acceptance=True
-        ).convert(broken, proposal, specs, workforce)
+        OrderToWorkforceBridge.strict(registry).convert(broken, proposal, specs, workforce)
 
 
 
@@ -249,9 +243,7 @@ def test_verified_attestation_signature_is_persisted_with_order_evidence(tmp_pat
 
     proposal, order, registry, _, specs = _signed_order()
     workforce = PersistentWorkforce(tmp_path / "verified-order.sqlite3")
-    OrderToWorkforceBridge(
-        trusted_keys=registry, require_verified_acceptance=True
-    ).convert(order, proposal, specs, workforce)
+    OrderToWorkforceBridge.strict(registry).convert(order, proposal, specs, workforce)
     evidence = workforce.repository.load_order_acceptance_evidence(order.order_id)
     assert evidence["acceptance_verification"]["status"] == "VERIFIED"
     assert evidence["acceptance_verification"]["key_id"] == "key-1"
