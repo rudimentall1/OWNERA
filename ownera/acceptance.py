@@ -13,6 +13,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Self
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -94,7 +95,7 @@ class TrustedCustomerKeyRegistry:
     def close(self) -> None:
         self._connection.close()
 
-    def __enter__(self) -> "TrustedCustomerKeyRegistry":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
