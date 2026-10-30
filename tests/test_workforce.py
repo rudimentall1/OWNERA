@@ -4,10 +4,10 @@ import pytest
 
 from ownera.workforce import (
     TaskStatus,
-    WorkTask,
     WorkerProfile,
     WorkforceEngine,
     WorkforceError,
+    WorkTask,
 )
 
 
