@@ -64,7 +64,7 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Couple commercial snapshot writes with append-only hash-chained events in one SQLite transaction
 - [x] Couple order-handoff persistence with append-only events in one SQLite transaction
 - [x] Persist customer and owner acceptance evidence with digest binding in the order handoff transaction
-- [x] Add Ed25519 customer acceptance verification against owner-enrolled keys (in-memory MVP registry; opt-in strict enforcement)\n- [ ] Persist trusted customer key enrollment, rotation, revocation, and administrative audit\n- [ ] Verify customer acceptance against a trusted contract or payment source
+- [x] Add Ed25519 customer acceptance verification against owner-enrolled keys (in-memory MVP registry; opt-in strict enforcement)\n- [x] Persist trusted customer key enrollment, rotation, revocation, and hash-chained audit (authenticated admin boundary remains open)\n- [ ] Verify customer acceptance against a trusted contract or payment source
 - [ ] Select one narrow service with measurable demand and delivery criteria
 - [ ] Define isolated execution environments and bounded worker runtimes
 - [ ] Add permitted source adapters and discover real paid work
