@@ -6,6 +6,8 @@
 
 ## Purpose
 
+The commercial intake and qualification boundary is documented in [Commercial Engine](COMMERCIAL-ENGINE.md). A proposal approval is not a customer acceptance or a delivery authorization.
+
 The Workforce Engine coordinates specialist agents that execute customer work. It is not a single “production agent” and it is not an LLM runtime. It owns the task contract, worker eligibility, assignment, dependency gates, budget checks, and independent review lifecycle.
 
 Commercial discovery, contract approval, worker execution, delivery, customer acceptance, and payment reconciliation are separate capabilities. This module implements only the deterministic coordination boundary.
