@@ -13,7 +13,10 @@ from ownera.workforce import (
     WorkforceEngine,
     WorkTask,
 )
-from ownera.workforce_repository import SQLiteWorkforceRepository
+from ownera.workforce_repository import (
+    PersistedOrderHandoff,
+    SQLiteWorkforceRepository,
+)
 
 
 class PersistentWorkforce:
@@ -57,6 +60,37 @@ class PersistentWorkforce:
 
     def add_tasks(self, tasks: tuple[WorkTask, ...]) -> None:
         self._execute(lambda: self._engine.add_tasks(tasks))
+
+
+    def add_order_tasks(
+        self,
+        tasks: tuple[WorkTask, ...],
+        *,
+        order_id: UUID,
+        proposal_id: UUID,
+        converted_at: str,
+        plan_digest: str,
+    ) -> PersistedOrderHandoff:
+        """Atomically persist the complete task graph and its order idempotency key."""
+        try:
+            self._engine.add_tasks(tasks)
+            record = self.repository.save_with_order_handoff(
+                self._engine,
+                expected_version=self._version,
+                order_id=order_id,
+                proposal_id=proposal_id,
+                task_ids=tuple(task.task_id for task in tasks),
+                converted_at=converted_at,
+                plan_digest=plan_digest,
+            )
+            if record.created:
+                self._version = record.snapshot_version
+            else:
+                self.refresh()
+            return record
+        except Exception:
+            self.refresh()
+            raise
 
     def assign(self, task_id: UUID) -> WorkTask:
         return self._execute(lambda: self._engine.assign(task_id))
