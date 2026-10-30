@@ -372,6 +372,19 @@ class SQLiteWorkforceRepository:
                 raise SnapshotIntegrityError(
                     f"acceptance evidence digest mismatch for order {order_id}"
                 )
+            self.event_store.verify("workforce", self.SNAPSHOT_ID)
+            matching_events = [
+                event for event in self.event_store.load("workforce", self.SNAPSHOT_ID)
+                if event.event_type == "OrderTasksHandedOff"
+                and event.payload.get("order_id") == str(order_id)
+            ]
+            if len(matching_events) != 1 or (
+                matching_events[0].payload.get("acceptance_evidence_digest")
+                != row["evidence_digest"]
+            ):
+                raise SnapshotIntegrityError(
+                    f"acceptance evidence is not bound to the order handoff event for {order_id}"
+                )
             return json.loads(row["evidence_json"])
         finally:
             connection.close()
