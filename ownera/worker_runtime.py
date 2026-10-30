@@ -167,7 +167,8 @@ class DockerWorkerRuntime:
             raise WorkerRuntimeError("task has too many input files")
         if len(request.artifact_paths) > self.limits.max_artifact_count:
             raise WorkerRuntimeError("task requests too many artifacts")
-        if sum(len(part.encode("utf-8")) for part in request.command) > self.limits.max_command_bytes:
+        command_size = sum(len(part.encode("utf-8")) for part in request.command)
+        if command_size > self.limits.max_command_bytes:
             raise WorkerRuntimeError("task command exceeds configured byte limit")
         if len(set(request.artifact_paths)) != len(request.artifact_paths):
             raise WorkerRuntimeError("artifact paths must be unique")
