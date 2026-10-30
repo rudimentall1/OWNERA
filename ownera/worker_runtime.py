@@ -38,6 +38,9 @@ class RuntimeLimits:
     pids: int = 64
     max_output_bytes: int = 1024 * 1024
     max_input_bytes: int = 10 * 1024 * 1024
+    max_input_files: int = 256
+    max_command_bytes: int = 32 * 1024
+    max_artifact_count: int = 64
     max_workspace_bytes: int = 64 * 1024 * 1024
     max_artifact_bytes: int = 10 * 1024 * 1024
     max_artifacts_total_bytes: int = 20 * 1024 * 1024
@@ -48,7 +51,8 @@ class RuntimeLimits:
             raise ValueError("cpu_cores must be in (0, 8]")
         for name in (
             "memory_bytes", "wall_seconds", "pids", "max_output_bytes",
-            "max_input_bytes", "max_workspace_bytes", "max_artifact_bytes",
+            "max_input_bytes", "max_input_files", "max_command_bytes",
+            "max_artifact_count", "max_workspace_bytes", "max_artifact_bytes",
             "max_artifacts_total_bytes", "tmp_bytes",
         ):
             if getattr(self, name) <= 0:
@@ -78,6 +82,12 @@ class WorkerExecutionRequest:
             for part in self.command
         ):
             raise ValueError("command must contain non-empty strings without NUL")
+        if len(self.input_files) > 256:
+            raise WorkerRuntimeError("too many input files")
+        if len(self.artifact_paths) > 64:
+            raise WorkerRuntimeError("too many requested artifacts")
+        if sum(len(part.encode("utf-8")) for part in self.command) > 32 * 1024:
+            raise WorkerRuntimeError("command exceeds configured byte limit")
         for path in self.input_files:
             _safe_relative_path(path)
         for path in self.artifact_paths:
@@ -101,7 +111,12 @@ def _safe_relative_path(value: str) -> PurePosixPath:
     if (
         not isinstance(value, str) or not value or "\x00" in value
         or "\\" in value or value.startswith("/")
-        or any(part in ("", ".", "..") for part in value.split("/"))
+        or len(value) > 240
+        or len(value.split("/")) > 16
+        or any(
+            part in ("", ".", "..") or len(part.encode("utf-8")) > 100
+            for part in value.split("/")
+        )
     ):
         raise WorkerRuntimeError("file paths must be safe relative POSIX paths")
     return PurePosixPath(value)
@@ -148,6 +163,12 @@ class DockerWorkerRuntime:
         input_size = sum(len(content) for content in request.input_files.values())
         if input_size > self.limits.max_input_bytes:
             raise WorkerRuntimeError("task inputs exceed configured byte limit")
+        if len(request.input_files) > self.limits.max_input_files:
+            raise WorkerRuntimeError("task has too many input files")
+        if len(request.artifact_paths) > self.limits.max_artifact_count:
+            raise WorkerRuntimeError("task requests too many artifacts")
+        if sum(len(part.encode("utf-8")) for part in request.command) > self.limits.max_command_bytes:
+            raise WorkerRuntimeError("task command exceeds configured byte limit")
         if len(set(request.artifact_paths)) != len(request.artifact_paths):
             raise WorkerRuntimeError("artifact paths must be unique")
 
