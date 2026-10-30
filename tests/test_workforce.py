@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -131,3 +132,15 @@ def test_no_worker_is_assigned_without_required_capabilities():
 
     with pytest.raises(WorkforceError, match="no eligible worker"):
         engine.assign(task.task_id)
+
+
+
+def test_add_tasks_validates_entire_batch_before_mutating_engine():
+    engine = WorkforceEngine()
+    first = _task()
+    invalid = _task(dependencies=(uuid4(),))
+
+    with pytest.raises(WorkforceError, match="dependencies"):
+        engine.add_tasks((first, invalid))
+
+    assert engine.tasks == ()
