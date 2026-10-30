@@ -65,7 +65,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Couple order-handoff persistence with append-only events in one SQLite transaction
 - [x] Persist customer and owner acceptance evidence with digest binding in the order handoff transaction
 - [x] Add Ed25519 customer acceptance verification against owner-enrolled keys (SQLite registry; opt-in strict enforcement)
-- [x] Persist trusted customer key enrollment, rotation, revocation, and hash-chained audit (authenticated admin boundary remains open)
+- [x] Persist trusted customer key enrollment, rotation, revocation, and hash-chained audit
+- [x] Add fail-closed owner key-control service with verified-principal role checks and actor binding
+- [ ] Integrate production identity provider, phishing-resistant MFA, session revocation, and protected API boundary
 - [ ] Verify customer acceptance against a trusted contract or payment source
 - [ ] Select one narrow service with measurable demand and delivery criteria
 - [ ] Define isolated execution environments and bounded worker runtimes
