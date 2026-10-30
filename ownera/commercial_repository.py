@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from ownera.commercial import CommercialEngine
+from ownera.event_store import SQLiteEventStore, StoredEvent
 
 
 class CommercialRepositoryError(RuntimeError):
@@ -38,6 +39,7 @@ class SQLiteCommercialRepository:
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = str(database_path)
+        self.event_store = SQLiteEventStore(database_path)
         if self.database_path == ":memory:":
             raise ValueError("commercial persistence requires a file-backed database")
         Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
@@ -94,6 +96,64 @@ class SQLiteCommercialRepository:
             )
             connection.commit()
             return next_version
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def save_with_event(
+        self,
+        engine: CommercialEngine,
+        *,
+        expected_version: int,
+        expected_event_version: int,
+        event_type: str,
+        aggregate_id: str,
+        payload: dict[str, Any],
+        idempotency_key: str,
+    ) -> tuple[int, StoredEvent]:
+        """Commit a commercial snapshot and its audit event atomically."""
+        if expected_version < 0 or expected_event_version < 0:
+            raise ValueError("expected versions cannot be negative")
+        payload_json = json.dumps(
+            engine.to_snapshot(), sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+        digest = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT version FROM commercial_snapshots WHERE snapshot_id = ?",
+                (self.SNAPSHOT_ID,),
+            ).fetchone()
+            current = row["version"] if row else 0
+            if current != expected_version:
+                raise CommercialSnapshotConflict(
+                    f"expected commercial version {expected_version}, found {current}"
+                )
+            event = self.event_store.append_in_transaction(
+                connection,
+                aggregate_type="commercial_pipeline",
+                aggregate_id=aggregate_id,
+                event_type=event_type,
+                payload=payload,
+                expected_version=expected_event_version,
+                idempotency_key=idempotency_key,
+            )
+            next_version = current + 1
+            connection.execute(
+                """INSERT INTO commercial_snapshots(
+                    snapshot_id, version, payload_json, digest
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(snapshot_id) DO UPDATE SET
+                    version=excluded.version, payload_json=excluded.payload_json,
+                    digest=excluded.digest""",
+                (self.SNAPSHOT_ID, next_version, payload_json, digest),
+            )
+            connection.commit()
+            return next_version, event
         except Exception:
             connection.rollback()
             raise
