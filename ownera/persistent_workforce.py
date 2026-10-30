@@ -53,7 +53,10 @@ class PersistentWorkforce:
         self._execute(lambda: self._engine.register_worker(worker))
 
     def add_task(self, task: WorkTask) -> None:
-        self._execute(lambda: self._engine.add_task(task))
+        self.add_tasks((task,))
+
+    def add_tasks(self, tasks: tuple[WorkTask, ...]) -> None:
+        self._execute(lambda: self._engine.add_tasks(tasks))
 
     def assign(self, task_id: UUID) -> WorkTask:
         return self._execute(lambda: self._engine.assign(task_id))
