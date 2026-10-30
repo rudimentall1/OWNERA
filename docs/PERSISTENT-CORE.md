@@ -1,55 +1,45 @@
 # OWNERA Persistent Event Store
 
-**Status:** Commercial transitions now commit their versioned snapshot and append-only event in one SQLite transaction. Workforce snapshot transitions are not yet integrated with the event store.  
-**Code:** `ownera/event_store.py`  
-**Tests:** `tests/test_event_store.py`
-
-## Why this exists
-
-The initial Commercial Engine, Workforce Engine and Order-to-Workforce Bridge began as in-memory domain prototypes. File-backed snapshot persistence now restores commercial opportunities, assessments, qualification results, proposals and owner approvals, as well as workforce tasks and reviews. The event store remains a separate primitive and does not yet record these transitions.
-
-This module introduces a file-backed persistence primitive without changing those domain APIs prematurely.
+**Status:** Commercial and workforce lifecycle transitions now commit their versioned snapshots and append-only events in one SQLite transaction. Order-handoff persistence is atomic for its snapshot and idempotency record, but is not yet coupled to the event stream.
+**Code:** `ownera/event_store.py`, `ownera/commercial_repository.py`, `ownera/persistent_commercial.py`, `ownera/workforce_repository.py`, `ownera/persistent_workforce.py`
+**Tests:** `tests/test_event_store.py`, `tests/test_commercial_repository.py`, `tests/test_persistent_workforce.py`
 
 ## Stored event model
 
-Each event contains:
-- event UUID;
-- aggregate type and aggregate ID;
-- monotonically increasing aggregate version;
-- event type;
-- canonical JSON payload;
-- UTC timestamp;
-- optional idempotency key;
-- previous event hash;
-- current SHA-256 event hash.
+Each event contains an event UUID, aggregate type and ID, monotonically increasing aggregate version, event type, canonical JSON payload, UTC timestamp, optional idempotency key, previous event hash, and current SHA-256 event hash.
 
-The SQLite schema enforces unique aggregate versions and globally unique idempotency keys. Writes use `BEGIN IMMEDIATE` and optimistic expected-version checks. WAL mode and FULL synchronous mode are enabled for the file-backed database.
+The SQLite schema enforces unique aggregate versions and globally unique idempotency keys. Writes use `BEGIN IMMEDIATE` and optimistic expected-version checks. WAL mode and FULL synchronous mode are enabled for file-backed databases.
+
+## Atomic domain persistence
+
+Commercial transitions use the `commercial_pipeline/primary` aggregate. Opportunity discovery, assessment, proposal drafting, and owner approval each commit the commercial snapshot and matching event atomically.
+
+Workforce transitions use the `workforce/primary` aggregate. Worker registration, task creation, assignment, start, submission, and review commit the workforce snapshot and matching event atomically. Event-version conflicts roll back the domain snapshot write.
+
+The order-to-workforce handoff still commits the task graph and order idempotency record together, but does not yet append an event in that same transaction. This is the next persistence gap to close.
 
 ## Integrity and concurrency
 
-Events are hash-chained per aggregate. `verify(aggregate_type, aggregate_id)` recomputes each event hash and checks the version sequence and predecessor links.
+Events are hash-chained per aggregate. `verify(aggregate_type, aggregate_id)` recomputes each event hash and checks the version sequence and predecessor links. Snapshot digests are checked independently.
 
-This is tamper-evident, not tamper-proof. A privileged attacker who can rewrite the entire database and recompute every hash can replace the history. Production hardening requires external checkpoints or signatures, protected backups, access controls and monitoring.
-
-Optimistic concurrency prevents two writers from silently appending to the same aggregate version. An idempotency key safely returns the original event for an identical request and rejects reuse for different event content.
+This is tamper-evident, not tamper-proof. A privileged attacker able to rewrite the entire database and recompute every hash can replace the history. Production hardening requires external checkpoints or signatures, protected backups, access controls, and monitoring.
 
 ## Deliberate limitations
 
-- File-backed SQLite only; use a temporary file in tests rather than an in-memory connection.
-- No ORM or external dependency; Python standard library only.
-- Commercial snapshot writes are transactionally coupled to commercial events. Workforce snapshot writes are still separate from event history.
-- No event replay into CommercialEngine, WorkforceEngine or OrderToWorkforceBridge yet.
-- No snapshots, multi-process deployment guarantees beyond SQLite locking, backup automation, encryption-at-rest configuration or remote replication.
-- The event store does not authorize business transitions. Domain services must validate first, then append the corresponding event.
+- File-backed SQLite only; tests use temporary files.
+- No event replay into domain engines yet; snapshots remain the recovery source.
+- No distributed queue, multi-tenant isolation, automated backup, encryption-at-rest configuration, or remote replication.
+- Whole-state snapshots are rewritten on each transition.
+- The event store records validated domain transitions; it does not authorize them or execute agents.
 
 ## Next integration sequence
 
-1. Couple workforce task lifecycle and order-handoff writes to append-only events in the same SQLite transactions.
+1. Couple order-handoff idempotency records, task graph, snapshot, and event in one transaction.
 2. Add durable customer acceptance and contract evidence before order creation.
-3. Add backup/restore tests and crash-recovery tests across all repositories.
-4. Add external event checkpoints or signatures for stronger tamper evidence.
+3. Add backup/restore and crash-recovery tests across repositories.
+4. Add external event checkpoints or signatures.
 5. Move to PostgreSQL only when concurrent deployment or operational requirements justify it.
 
 ## Production acceptance gate
 
-A process restart must restore the exact proposal, approval, order, task and review state. Duplicate requests must not create duplicate work. A modified event must fail integrity verification. A stale writer must not overwrite a newer aggregate version. Backups must be restorable and verified.
+A process restart must restore exact proposal, approval, order, task, and review state. Duplicate requests must not create duplicate work. A modified snapshot or event must fail integrity verification. A stale writer must not overwrite a newer aggregate version. Backups must be restorable and verified.
