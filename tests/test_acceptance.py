@@ -86,7 +86,24 @@ def test_wrong_customer_and_revoked_key_are_rejected():
         verify_customer_acceptance(order, registry)
 
 
-def test_default_legacy_path_is_not_mistaken_for_verified():
-    proposal, order, _, workforce, specs = _signed_order()
+def test_default_legacy_path_is_persisted_as_unverified(tmp_path):
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    proposal, order, _, _, specs = _signed_order()
     unsigned = replace(order, acceptance_attestation=None)
+    workforce = PersistentWorkforce(tmp_path / "ownera.sqlite3")
     OrderToWorkforceBridge().convert(unsigned, proposal, specs, workforce)
+    evidence = workforce.repository.load_order_acceptance_evidence(order.order_id)
+    assert evidence["acceptance_verification"]["status"] == "UNVERIFIED"
+
+
+def test_invalid_signature_is_rejected_before_handoff():
+    proposal, order, registry, workforce, specs = _signed_order()
+    broken = replace(order, acceptance_attestation=CustomerAcceptanceAttestation(
+        "key-1", base64.b64encode(b"invalid-signature").decode(), "nonce-1"
+    ))
+    with pytest.raises(OrderHandoffError, match="signature is invalid"):
+        OrderToWorkforceBridge(
+            trusted_keys=registry, require_verified_acceptance=True
+        ).convert(broken, proposal, specs, workforce)
+
