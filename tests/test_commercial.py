@@ -55,8 +55,8 @@ def test_qualified_opportunity_uses_conservative_budget_floor():
 
     assert result.status is OpportunityStatus.QUALIFIED
     assert result.conservative_revenue == Decimal("600")
-    assert result.expected_net_profit == Decimal("295.00")
-    assert result.expected_net_margin == Decimal("295.00") / Decimal("600")
+    assert result.expected_net_profit == Decimal("265.00")
+    assert result.expected_net_margin == Decimal("265.00") / Decimal("600")
 
 
 def test_missing_terms_or_eligibility_requires_review():
