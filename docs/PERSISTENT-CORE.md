@@ -1,6 +1,6 @@
 # OWNERA Persistent Event Store
 
-**Status:** Durable SQLite event-store primitive implemented. Workforce and commercial domain state now also have separate versioned snapshot repositories. The event store is not yet wired into those domain transitions.  
+**Status:** Commercial transitions now commit their versioned snapshot and append-only event in one SQLite transaction. Workforce snapshot transitions are not yet integrated with the event store.  
 **Code:** `ownera/event_store.py`  
 **Tests:** `tests/test_event_store.py`
 
@@ -37,17 +37,17 @@ Optimistic concurrency prevents two writers from silently appending to the same 
 
 - File-backed SQLite only; use a temporary file in tests rather than an in-memory connection.
 - No ORM or external dependency; Python standard library only.
-- Commercial and workforce snapshot repositories exist, but are separate from this event store.
+- Commercial snapshot writes are transactionally coupled to commercial events. Workforce snapshot writes are still separate from event history.
 - No event replay into CommercialEngine, WorkforceEngine or OrderToWorkforceBridge yet.
 - No snapshots, multi-process deployment guarantees beyond SQLite locking, backup automation, encryption-at-rest configuration or remote replication.
 - The event store does not authorize business transitions. Domain services must validate first, then append the corresponding event.
 
 ## Next integration sequence
 
-1. Integrate append-only commercial, order and workforce transition events with their snapshot writes.
+1. Couple workforce task lifecycle and order-handoff writes to append-only events in the same SQLite transactions.
 2. Add durable customer acceptance and contract evidence before order creation.
-3. Add append-only approval and audit records with actor, timestamp, policy version and evidence reference.
-4. Add backup/restore tests and crash-recovery tests across all repositories.
+3. Add backup/restore tests and crash-recovery tests across all repositories.
+4. Add external event checkpoints or signatures for stronger tamper evidence.
 5. Move to PostgreSQL only when concurrent deployment or operational requirements justify it.
 
 ## Production acceptance gate
