@@ -54,7 +54,8 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add initial SQLite append-only event store with optimistic concurrency and hash-chain verification
 - [x] Add versioned SQLite workforce snapshot repository with restart recovery and digest verification
 - [x] Persist workforce transitions automatically through a versioned SQLite facade
-- [ ] Make order handoff and workforce task creation one atomic database transaction
+- [x] Validate and persist complete workforce task graphs as one snapshot during handoff
+- [ ] Persist order-to-handoff idempotency and task graph in one atomic database transaction
 - [ ] Integrate persistent repositories and state restoration for commercial and order aggregates
 - [x] Persist workforce state with restart recovery and optimistic concurrency
 - [ ] Integrate append-only transition evidence with the workforce repository
