@@ -26,7 +26,11 @@ def _task(*, dependencies=()):
 def _engine():
     return WorkforceEngine(
         (
-            WorkerProfile("backend-1", "backend", frozenset({"python", "fastapi"})),
+            WorkerProfile(
+                "backend-1",
+                "backend",
+                frozenset({"python", "fastapi", "quality.review"}),
+            ),
             WorkerProfile("qa-1", "qa", frozenset({"quality.review"})),
         )
     )
