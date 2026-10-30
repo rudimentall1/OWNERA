@@ -70,7 +70,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Integrate production identity provider, phishing-resistant MFA, session revocation, and protected API boundary
 - [ ] Verify customer acceptance against a trusted contract or payment source
 - [ ] Select one narrow service with measurable demand and delivery criteria
-- [ ] Define isolated execution environments and bounded worker runtimes
+- [x] Define isolated execution environments and bounded worker runtimes (initial digest-pinned Docker adapter)
+- [ ] Deploy on a hardened runner and pass adversarial isolation tests
+- [ ] Connect accepted runtime execution to persisted task lifecycle and artifact evidence
 - [ ] Add permitted source adapters and discover real paid work
 - [ ] Owner-approved contracts and customer commitments
 - [ ] Deliver work and independent quality review
