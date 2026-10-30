@@ -260,7 +260,7 @@ class SQLiteWorkforceRepository:
                 )
                 if not same_request:
                     raise SnapshotConflict(
-                        "order ID was already committed with different proposal or task plan"
+                        "order ID was already committed with different proposal, task plan, or acceptance evidence"
                     )
                 connection.commit()
                 return PersistedOrderHandoff(
