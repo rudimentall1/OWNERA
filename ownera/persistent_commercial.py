@@ -25,6 +25,7 @@ class PersistentCommercialEngine:
         snapshot = self.repository.load()
         self._engine = snapshot.engine if snapshot else CommercialEngine()
         self._version = snapshot.version if snapshot else 0
+        self.repository.event_store.verify("commercial_pipeline", "primary")
         self._event_version = len(
             self.repository.event_store.load("commercial_pipeline", "primary")
         )
