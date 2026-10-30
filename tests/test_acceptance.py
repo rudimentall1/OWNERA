@@ -242,3 +242,20 @@ def test_registry_detects_key_table_tampering(tmp_path):
     with pytest.raises(TrustedKeyRegistryError, match="differs from audit history"):
         restored.get_active("customer", "key")
     restored.close()
+
+
+def test_verified_attestation_signature_is_persisted_with_order_evidence(tmp_path):
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    proposal, order, registry, _, specs = _signed_order()
+    workforce = PersistentWorkforce(tmp_path / "verified-order.sqlite3")
+    OrderToWorkforceBridge(
+        trusted_keys=registry, require_verified_acceptance=True
+    ).convert(order, proposal, specs, workforce)
+    evidence = workforce.repository.load_order_acceptance_evidence(order.order_id)
+    assert evidence["acceptance_verification"]["status"] == "VERIFIED"
+    assert evidence["acceptance_verification"]["key_id"] == "key-1"
+    assert evidence["customer_acceptance_attestation"]["signature_b64"] == (
+        order.acceptance_attestation.signature_b64
+    )
+    assert evidence["customer_acceptance_attestation"]["nonce"] == "nonce-1"
