@@ -6,6 +6,8 @@ was approved by the owner. It does not execute tasks or submit deliverables.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -164,17 +166,55 @@ class OrderToWorkforceBridge:
         if converted_at.tzinfo is None:
             raise ValueError("conversion timestamp must be timezone-aware")
 
-        # Register the complete task graph in one domain operation. Persistent
-        # workforce adapters commit the full graph in one SQLite snapshot.
+        # The plan digest excludes generated task IDs so a retry after a crash
+        # can resolve to the original committed task graph.
+        plan_payload = [
+            {
+                "title": spec.title,
+                "description": spec.description,
+                "required_capabilities": sorted(spec.required_capabilities),
+                "budget_limit": str(spec.budget_limit),
+                "currency": order.currency.upper(),
+                "acceptance_criteria": list(spec.acceptance_criteria),
+                "depends_on": list(spec.depends_on),
+            }
+            for spec in task_specs
+        ]
+        plan_digest = hashlib.sha256(
+            json.dumps(
+                plan_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()
+
+        # PersistentWorkforce commits the task graph and unique order record in
+        # the same SQLite transaction. The in-memory engine uses atomic batching.
         try:
-            workforce.add_tasks(tuple(tasks))
+            if hasattr(workforce, "add_order_tasks"):
+                persisted = workforce.add_order_tasks(
+                    tuple(tasks),
+                    order_id=order.order_id,
+                    proposal_id=proposal.proposal_id,
+                    converted_at=converted_at.isoformat(),
+                    plan_digest=plan_digest,
+                )
+                handoff = OrderHandoff(
+                    order_id=persisted.order_id,
+                    proposal_id=persisted.proposal_id,
+                    task_ids=persisted.task_ids,
+                    converted_at=datetime.fromisoformat(persisted.converted_at),
+                )
+            else:
+                workforce.add_tasks(tuple(tasks))
+                handoff = OrderHandoff(
+                    order_id=order.order_id,
+                    proposal_id=proposal.proposal_id,
+                    task_ids=tuple(task.task_id for task in tasks),
+                    converted_at=converted_at,
+                )
         except Exception as exc:
             raise OrderHandoffError("task graph registration failed") from exc
-        handoff = OrderHandoff(
-            order_id=order.order_id,
-            proposal_id=proposal.proposal_id,
-            task_ids=tuple(task.task_id for task in tasks),
-            converted_at=converted_at,
-        )
         self._handoffs[order.order_id] = handoff
         return handoff
