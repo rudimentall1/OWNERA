@@ -35,6 +35,8 @@ def _order(proposal, **overrides):
         "accepted_amount": Decimal("1000"),
         "currency": "EUR",
         "customer_acceptance_ref": "contract:sha256:abc123",
+        "accepted_scope": proposal.scope,
+        "accepted_acceptance_criteria": proposal.acceptance_criteria,
         "customer_accepted_at": datetime.now(timezone.utc) - timedelta(hours=1),
         "owner_approved_by": "owner-1",
         "owner_approved_at": datetime.now(timezone.utc) - timedelta(hours=1, minutes=30),
@@ -146,4 +148,24 @@ def test_task_plan_dependencies_must_be_topologically_ordered():
     with pytest.raises(OrderHandoffError, match="earlier tasks"):
         OrderToWorkforceBridge().convert(
             _order(proposal), proposal, invalid, _workforce()
+        )
+
+
+def test_customer_accepted_scope_must_match_proposal():
+    proposal = _proposal()
+    order = _order(proposal, accepted_scope="A materially different scope")
+
+    with pytest.raises(OrderHandoffError, match="scope differs"):
+        OrderToWorkforceBridge().convert(
+            order, proposal, _specs(), _workforce()
+        )
+
+
+def test_customer_accepted_criteria_must_match_proposal():
+    proposal = _proposal()
+    order = _order(proposal, accepted_acceptance_criteria=("Only API works",))
+
+    with pytest.raises(OrderHandoffError, match="criteria differ"):
+        OrderToWorkforceBridge().convert(
+            order, proposal, _specs(), _workforce()
         )
