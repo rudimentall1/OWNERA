@@ -1,7 +1,7 @@
 # OWNERA Workforce Persistence
 
 **Status:** Initial SQLite snapshot persistence for the workforce engine is implemented. Commercial and order aggregates remain in memory.  
-**Code:** `ownera/workforce_repository.py`, `ownera/workforce.py`  
+**Code:** `ownera/workforce_repository.py`, `ownera/persistent_workforce.py`, `ownera/workforce.py`  
 **Tests:** `tests/test_workforce_repository.py`
 
 ## What is persisted
@@ -14,6 +14,12 @@ The repository stores a complete versioned snapshot of:
 - review decisions, findings and timestamps.
 
 Decimal values are serialized as strings. UUIDs and timestamps use canonical textual representations. The snapshot payload is hashed with SHA-256 and verified before restoration.
+
+## Automatic transition persistence
+
+Use `PersistentWorkforce` as the application-facing facade instead of calling `WorkforceEngine` directly. Worker registration, task creation, assignment, start, submission and review are saved before the command returns successfully. If a save fails, the facade reloads the last committed snapshot and raises the error. A stale process cannot silently overwrite a newer snapshot; it receives a version conflict and refreshes to committed state.
+
+The facade is synchronous and uses one whole-workforce snapshot. It is suitable for the current single-process MVP and basic stale-writer detection, not a distributed job queue or high-throughput multi-tenant service.
 
 ## Save protocol
 
@@ -28,7 +34,7 @@ On startup, load the snapshot and restore a `WorkforceEngine` instance. A missin
 ## Current limits
 
 - One primary workforce snapshot per database.
-- No automatic save after each domain transition; callers must explicitly save.
+- Whole-workforce snapshot writes on each transition may become expensive as task history grows.
 - No atomic transaction spanning order handoff and workforce persistence yet.
 - No commercial opportunity, assessment, proposal or order repositories.
 - No encrypted database, automated backup, restore drill or external hash checkpoint.
@@ -36,7 +42,7 @@ On startup, load the snapshot and restore a `WorkforceEngine` instance. A missin
 
 ## Next production gates
 
-1. Persist each validated workforce transition automatically.
+1. Replace whole-state snapshots with transactional aggregate/event persistence as workload grows.
 2. Add transactional order handoff so a crash cannot create partial task graphs.
 3. Add repositories for commercial opportunities, assessments, proposals and customer orders.
 4. Add backup, restore and crash-injection tests.
