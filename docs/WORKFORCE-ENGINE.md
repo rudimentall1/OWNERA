@@ -6,7 +6,7 @@
 
 ## Purpose
 
-The commercial intake and qualification boundary is documented in [Commercial Engine](COMMERCIAL-ENGINE.md). A proposal approval is not a customer acceptance or a delivery authorization.
+The commercial intake and qualification boundary is documented in [Commercial Engine](COMMERCIAL-ENGINE.md). The customer-accepted order gate and task graph conversion are documented in [Order-to-Workforce Handoff](ORDER-HANDOFF.md). A proposal approval is not a customer acceptance or a delivery authorization.
 
 The Workforce Engine coordinates specialist agents that execute customer work. It is not a single “production agent” and it is not an LLM runtime. It owns the task contract, worker eligibility, assignment, dependency gates, budget checks, and independent review lifecycle.
 
