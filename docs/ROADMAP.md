@@ -1,6 +1,6 @@
 # OWNERA Roadmap
 
-The roadmap is deliberately ordered by safety. Autonomous financial capability expands only after the underlying authorization and recovery boundaries are proven.
+The roadmap is deliberately ordered by safety. Autonomy expands only after the underlying authorization, evidence, and recovery boundaries are proven.
 
 ## 0 — Foundation
 
@@ -31,7 +31,45 @@ The roadmap is deliberately ordered by safety. Autonomous financial capability e
 - [x] Reserve accumulation simulation boundary
 - [x] Initial adversarial/security tests
 
-## 2 — Crypto Testnet
+## 2 — Resource Discovery (read-only)
+
+- [ ] Define canonical resource-opportunity schema and provenance
+- [ ] Add approved public sources for grants, bounties, paid work, cloud credits, and compute
+- [ ] Normalize, deduplicate, rank, and expire opportunities
+- [ ] Check eligibility, ownership, terms, and required permissions
+- [ ] Produce an evidence-backed opportunity report
+- [ ] No external commitments, spending, or live financial execution in this phase
+
+## 3 — Owner-Approved Resource Acquisition
+
+- [ ] Application and proposal drafting
+- [ ] Owner approval before submission or commitment
+- [ ] Grant, bounty, customer, and infrastructure acquisition workflows
+- [ ] Verify actual receipt, restrictions, and expiry
+- [ ] Record costs, outcomes, and evidence
+
+## 4 — Earned Revenue and Agent Workforce
+
+- [ ] Select one narrow service with measurable demand and delivery criteria
+- [ ] Define agent roles, task scopes, and isolated execution environments
+- [ ] Discover and qualify real paid work
+- [ ] Owner-approved contracts and customer commitments
+- [ ] Deliver work and independent quality review
+- [ ] Verify settlement and calculate realized net profit/loss
+- [ ] Add a capped agent operating budget only after the workflow is proven
+
+## 5 — Autonomous Treasury and Capital Allocation
+
+- [ ] Unified balance sheet
+- [ ] Cash-flow forecasting
+- [ ] Opportunity scanner and resource allocator
+- [ ] Risk-adjusted yield engine
+- [ ] DeFi protocol monitoring
+- [ ] Portfolio allocation proposals
+- [ ] Reproducible out-of-sample evaluation and paper trading
+- [ ] Policy-bounded autonomous rebalance after independent review
+
+## 6 — Crypto Testnet and Real Financial Rails
 
 - [ ] Smart-account abstraction
 - [ ] Testnet signer
@@ -41,27 +79,12 @@ The roadmap is deliberately ordered by safety. Autonomous financial capability e
 - [ ] Allowance protection
 - [ ] Session permissions
 - [ ] Emergency revoke / freeze
-
-## 3 — Autonomous Treasury
-
-- [ ] Unified balance sheet
-- [ ] Cash-flow forecasting
-- [ ] Opportunity scanner
-- [ ] Risk-adjusted yield engine
-- [ ] DeFi protocol monitoring
-- [ ] Portfolio allocation proposals
-- [ ] Policy-bounded autonomous rebalance
-
-## 4 — Real Financial Rails
-
 - [ ] Fiat/payment connectors
-- [ ] Recurring bills
 - [ ] Broker/fund connectors
-- [ ] Stablecoin on/off ramps
 - [ ] Strong owner authentication
 - [ ] Compliance-aware transaction routing
 
-## 5 — Advanced Security
+## 7 — Advanced Security
 
 - [ ] Hardware-backed signing
 - [ ] Cryptographic agility
@@ -72,4 +95,6 @@ The roadmap is deliberately ordered by safety. Autonomous financial capability e
 
 ## Long-Term Vision
 
-OWNERA should evolve into a personal autonomous treasury that can continuously operate within the owner's constitution, protect capital, satisfy financial obligations, and seek better risk-adjusted use of capital while preserving an owner-only Sovereign Reserve.
+OWNERA should evolve into an owner-directed autonomous treasury and agent operation that can discover opportunities, deliver useful work, acquire permitted resources, earn revenue, manage an operating budget, and seek better risk-adjusted use of capital while protecting the owner's assets and preserving an owner-only Sovereign Reserve.
+
+A list of opportunities, a submitted application, a simulated balance, an invoice, a backtest, or a model's profit forecast is not proof of acquired resources or realized profit.
