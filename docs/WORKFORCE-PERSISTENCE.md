@@ -1,6 +1,6 @@
 # OWNERA Workforce Persistence
 
-**Status:** Workforce lifecycle transitions now commit their versioned snapshot and hash-chained event in one SQLite transaction. Order handoff still uses its own atomic snapshot/idempotency transaction and is not yet coupled to the event stream.
+**Status:** Workforce lifecycle transitions and order handoffs now commit their versioned snapshot, idempotency record where applicable, and hash-chained event in one SQLite transaction.
 **Code:** `ownera/workforce_repository.py`, `ownera/persistent_workforce.py`, `ownera/workforce.py`
 **Tests:** `tests/test_workforce_repository.py`, `tests/test_persistent_workforce.py`
 
@@ -34,7 +34,6 @@ On startup, the facade verifies the workforce event chain and restores the lates
 
 ## Remaining production gates
 
-- Couple order-handoff idempotency records and task-graph creation to the same event transaction.
 - Add backup, restore, crash-injection, and process-kill recovery tests.
 - Add external event checkpoints or signatures, protected backups, and access controls.
 - Add isolated worker execution only after durable task state and recovery are reliable.
