@@ -14,7 +14,7 @@ The long-term goal is an owner-controlled agent operation that can find useful w
 
 The agent is powerful by design, but its authority and execution are constrained by deterministic security and policy controls.
 
-See [Resource Autonomy](docs/RESOURCE-AUTONOMY.md) for the Resource Autonomy Engine direction, [Commercial Engine](docs/COMMERCIAL-ENGINE.md) for opportunity qualification and owner-approved proposals, [Order-to-Workforce Handoff](docs/ORDER-HANDOFF.md) for customer-approved order conversion, [Workforce Engine](docs/WORKFORCE-ENGINE.md) for task coordination, and [Resource Intelligence research](docs/RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the unclaimed-resource market investigation.
+See [Resource Autonomy](docs/RESOURCE-AUTONOMY.md) for the Resource Autonomy Engine direction, [Commercial Engine](docs/COMMERCIAL-ENGINE.md) for opportunity qualification and owner-approved proposals, [Order-to-Workforce Handoff](docs/ORDER-HANDOFF.md) for customer-approved order conversion, [Persistent Core](docs/PERSISTENT-CORE.md) for durable event storage, [Workforce Engine](docs/WORKFORCE-ENGINE.md) for task coordination, and [Resource Intelligence research](docs/RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the unclaimed-resource market investigation.
 
 ## Core Principles
 
@@ -127,7 +127,7 @@ The Sovereign Reserve is a separate trust domain. Agents may contribute to it on
 
 **Stage: Architecture / Foundation**
 
-The repository contains foundational domain and policy interfaces, sandbox financial flows, audit and reserve boundaries, an autonomous treasury decision cycle, an isolated proposal-only external strategy protocol, an initial in-memory workforce coordination core with deterministic assignment and independent review gates, an initial in-memory commercial qualification core with conservative economics and owner approval for proposal drafts, and an order handoff bridge that converts customer-accepted, owner-approved orders into bounded workforce task graphs. Persistent storage, isolated worker execution, marketplace connectors, outbound proposal submission, real financial rails, and autonomous resource acquisition are not yet implemented. CI validation is tracked in GitHub Actions.
+The repository contains foundational domain and policy interfaces, sandbox financial flows, audit and reserve boundaries, an autonomous treasury decision cycle, an isolated proposal-only external strategy protocol, an initial in-memory workforce coordination core with deterministic assignment and independent review gates, an initial in-memory commercial qualification core with conservative economics and owner approval for proposal drafts, and an order handoff bridge that converts customer-accepted, owner-approved orders into bounded workforce task graphs. Domain-service persistence integration and state restoration, isolated worker execution, marketplace connectors, outbound proposal submission, real financial rails, and autonomous resource acquisition are not yet implemented. An initial SQLite append-only event-store primitive is available. CI validation is tracked in GitHub Actions.
 
 ## Roadmap
 
