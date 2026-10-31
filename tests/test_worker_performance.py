@@ -137,8 +137,7 @@ def test_unreviewed_attempt_is_not_falsely_marked_successful(tmp_path):
 
 def test_report_rejects_snapshot_when_event_history_advances(tmp_path):
     workforce, database = _setup(tmp_path)
-    events = workforce.repository.event_store
-    events.append(
+    workforce.repository.event_store.append(
         aggregate_type="workforce",
         aggregate_id="primary",
         event_type="TaskReviewAccepted",
