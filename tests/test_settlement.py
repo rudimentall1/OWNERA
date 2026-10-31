@@ -14,6 +14,16 @@ from ownera.settlement import (
 )
 
 
+class StaticOrderEvidence:
+    def __init__(self, orders):
+        self.orders = orders
+
+    def load_order_acceptance_evidence(self, order_id):
+        if order_id not in self.orders:
+            raise KeyError(order_id)
+        return self.orders[order_id]
+
+
 class StaticAuthenticator:
     def __init__(self, principals):
         self.principals = principals
@@ -40,9 +50,7 @@ def _principal(*, roles=frozenset({"owner:settlement"}), expired=False):
 def _record(ledger, order_id, **overrides):
     values = {
         "order_id": order_id,
-        "accepted_amount": Decimal("1000"),
         "amount": Decimal("400"),
-        "currency": "EUR",
         "payment_reference": "bank-transfer:ref-123",
         "evidence_sha256": "a" * 64,
         "recorded_by": "owner-1",
@@ -50,8 +58,15 @@ def _record(ledger, order_id, **overrides):
         "recorded_at": datetime(2026, 10, 31, tzinfo=timezone.utc),
     }
     values.update(overrides)
+    evidence = StaticOrderEvidence({
+        order_id: {
+            "order_id": str(order_id),
+            "accepted_amount": "1000",
+            "currency": "EUR",
+        }
+    })
     control = OwnerSettlementControl(
-        ledger, StaticAuthenticator({"valid-token": _principal()})
+        ledger, evidence, StaticAuthenticator({"valid-token": _principal()})
     )
     values.pop("recorded_by")
     return control.record_receipt("valid-token", **values)
@@ -179,7 +194,9 @@ def test_receipt_actor_is_derived_from_authenticated_owner(tmp_path):
 def test_non_owner_cannot_record_receipts(tmp_path, roles):
     ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
     control = OwnerSettlementControl(
-        ledger, StaticAuthenticator({"limited": _principal(roles=roles)})
+        ledger,
+        StaticOrderEvidence({}),
+        StaticAuthenticator({"limited": _principal(roles=roles)}),
     )
 
     order_id = uuid4()
@@ -187,9 +204,7 @@ def test_non_owner_cannot_record_receipts(tmp_path, roles):
         control.record_receipt(
             "limited",
             order_id=order_id,
-            accepted_amount=Decimal("100"),
             amount=Decimal("50"),
-            currency="EUR",
             payment_reference="ref",
             evidence_sha256="a" * 64,
             idempotency_key="limited-1",
@@ -200,15 +215,21 @@ def test_non_owner_cannot_record_receipts(tmp_path, roles):
 
 def test_invalid_and_expired_credentials_cannot_record_receipts(tmp_path):
     ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
-    invalid = OwnerSettlementControl(ledger, StaticAuthenticator({}))
+    order_id = uuid4()
+    evidence = StaticOrderEvidence({
+        order_id: {
+            "order_id": str(order_id),
+            "accepted_amount": "100",
+            "currency": "EUR",
+        }
+    })
+    invalid = OwnerSettlementControl(ledger, evidence, StaticAuthenticator({}))
     expired = OwnerSettlementControl(
-        ledger, StaticAuthenticator({"expired": _principal(expired=True)})
+        ledger, evidence, StaticAuthenticator({"expired": _principal(expired=True)})
     )
     args = {
-        "order_id": uuid4(),
-        "accepted_amount": Decimal("100"),
+        "order_id": order_id,
         "amount": Decimal("50"),
-        "currency": "EUR",
         "payment_reference": "ref",
         "evidence_sha256": "a" * 64,
         "idempotency_key": "invalid-1",
@@ -225,16 +246,79 @@ def test_invalid_and_expired_credentials_cannot_record_receipts(tmp_path):
 
 def test_malformed_authenticator_result_fails_closed(tmp_path):
     ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
-    control = OwnerSettlementControl(ledger, StaticAuthenticator({"malformed": None}))
+    order_id = uuid4()
+    evidence = StaticOrderEvidence({
+        order_id: {
+            "order_id": str(order_id),
+            "accepted_amount": "100",
+            "currency": "EUR",
+        }
+    })
+    control = OwnerSettlementControl(
+        ledger, evidence, StaticAuthenticator({"malformed": None})
+    )
 
     with pytest.raises(OwnerControlError, match="invalid principal"):
         control.record_receipt(
             "malformed",
-            order_id=uuid4(),
-            accepted_amount=Decimal("100"),
+            order_id=order_id,
             amount=Decimal("50"),
-            currency="EUR",
             payment_reference="ref",
             evidence_sha256="a" * 64,
             idempotency_key="malformed-1",
+        )
+
+
+
+def test_receipt_cap_and_currency_come_from_canonical_order_evidence(tmp_path):
+    ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
+    order_id = uuid4()
+    evidence = StaticOrderEvidence({
+        order_id: {
+            "order_id": str(order_id),
+            "accepted_amount": "250.00",
+            "currency": "USD",
+        }
+    })
+    control = OwnerSettlementControl(
+        ledger, evidence, StaticAuthenticator({"valid": _principal()})
+    )
+
+    receipt = control.record_receipt(
+        "valid",
+        order_id=order_id,
+        amount=Decimal("250"),
+        payment_reference="wire-1",
+        evidence_sha256="b" * 64,
+        idempotency_key="canonical-order-1",
+    )
+
+    assert receipt.accepted_amount == Decimal("250.00")
+    assert receipt.currency == "USD"
+    with pytest.raises(ReceiptLimitExceeded):
+        control.record_receipt(
+            "valid",
+            order_id=order_id,
+            amount=Decimal("0.01"),
+            payment_reference="wire-2",
+            evidence_sha256="c" * 64,
+            idempotency_key="canonical-order-2",
+        )
+
+
+def test_receipt_fails_when_canonical_order_evidence_is_missing(tmp_path):
+    ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
+    control = OwnerSettlementControl(
+        ledger, StaticOrderEvidence({}), StaticAuthenticator({"valid": _principal()})
+    )
+    order_id = uuid4()
+
+    with pytest.raises(OwnerControlError, match="canonical accepted-order evidence"):
+        control.record_receipt(
+            "valid",
+            order_id=order_id,
+            amount=Decimal("50"),
+            payment_reference="wire-1",
+            evidence_sha256="d" * 64,
+            idempotency_key="missing-order-1",
         )
