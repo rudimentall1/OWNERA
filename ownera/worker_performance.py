@@ -23,7 +23,7 @@ class CurrencyCost:
 class WorkerPerformance:
     worker_id: str
     enabled: bool
-    started_tasks: int
+    started_attempts: int
     submitted_attempts: int
     reviewed_attempts: int
     accepted_attempts: int
@@ -58,6 +58,8 @@ class WorkerPerformanceService:
         event_store = self.workforce.repository.event_store
         verified = event_store.verify("workforce", self.workforce.AGGREGATE_ID)
         events = event_store.load("workforce", self.workforce.AGGREGATE_ID)
+        if len(events) != self.workforce.event_version:
+            raise WorkerPerformanceError("workforce snapshot is stale relative to event history")
         profiles = {worker.worker_id: worker for worker in self.workforce.workers}
         stats: dict[str, dict[str, Any]] = {
             worker_id: {
@@ -103,6 +105,7 @@ class WorkerPerformanceService:
                 latest_submission[task_id] = (worker_id, str(attempt_index[task_id]))
             elif event.event_type in ("TaskReviewAccepted", "TaskReviewRejected"):
                 task_id = self._required_string(payload, "task_id", event)
+                self._required_string(payload, "reviewer_id", event)
                 accepted = payload.get("accepted")
                 if not isinstance(accepted, bool):
                     raise WorkerPerformanceError("review event has invalid accepted flag")
@@ -134,7 +137,7 @@ class WorkerPerformanceService:
                 WorkerPerformance(
                     worker_id=worker_id,
                     enabled=profile.enabled,
-                    started_tasks=item["started"],
+                    started_attempts=item["started"],
                     submitted_attempts=item["submitted"],
                     reviewed_attempts=reviewed,
                     accepted_attempts=accepted,
