@@ -6,6 +6,7 @@ on:
       worker_image:
         description: "Trusted prebuilt worker image pinned by @sha256:<64 lowercase hex>"
         required: true
+        default: "python:3.11.18-slim-bookworm@sha256:ef521de1d817dc92a6358c906bbadb9a0b7e38040038642833521b9d582c2233"
         type: string
 
 permissions:
