@@ -114,7 +114,7 @@ def test_incomplete_report_cannot_transition_task(tmp_path):
 
 
 def test_duplicate_criterion_is_rejected(tmp_path):
-    workforce, task, service, record = _review_packet(tmp_path)
+    _workforce, task, service, record = _review_packet(tmp_path)
     duplicate = (
         CriterionAssessment("Output is valid", True, (record.sha256,)),
         CriterionAssessment("Output is valid", True, (record.sha256,)),
@@ -127,7 +127,7 @@ def test_duplicate_criterion_is_rejected(tmp_path):
 
 
 def test_unverified_evidence_reference_is_rejected(tmp_path):
-    workforce, task, service, record = _review_packet(tmp_path)
+    _workforce, task, service, record = _review_packet(tmp_path)
     invalid = (
         CriterionAssessment("Output is valid", True, ("0" * 64,)),
         CriterionAssessment("Output is documented", True, (record.sha256,)),
@@ -140,7 +140,7 @@ def test_unverified_evidence_reference_is_rejected(tmp_path):
 
 
 def test_failed_criterion_requires_actionable_notes(tmp_path):
-    workforce, task, service, record = _review_packet(tmp_path)
+    _workforce, task, service, record = _review_packet(tmp_path)
     invalid = (
         CriterionAssessment("Output is valid", True, (record.sha256,)),
         CriterionAssessment("Output is documented", False, (record.sha256,)),
@@ -153,7 +153,7 @@ def test_failed_criterion_requires_actionable_notes(tmp_path):
 
 
 def test_report_requires_notes_and_rejects_naive_timestamp(tmp_path):
-    workforce, task, service, record = _review_packet(tmp_path)
+    _workforce, task, service, record = _review_packet(tmp_path)
     with pytest.raises(QualityGateError, match="overall review notes"):
         service.review(
             task.task_id, "reviewer", _assessments(record.sha256), overall_notes=" "
