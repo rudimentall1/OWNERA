@@ -92,7 +92,7 @@ class WorkerExecutionService:
             records.append(record)
             refs.append(f"sha256:{record.sha256}")
 
-        submitted = self.workforce.submit(
+        self.workforce.submit(
             task.task_id,
             worker_id,
             summary=summary,
