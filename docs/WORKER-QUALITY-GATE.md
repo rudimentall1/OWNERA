@@ -39,4 +39,5 @@ The structured versioned report is serialized canonically and embedded in the ex
 - [x] Persist a versioned structured report through the existing Workforce review event.
 - [x] Pass only when all criteria pass; otherwise return task for rework.
 - [x] Run unit tests and CI on this commit.
-- [ ] Verify real Docker-produced artifacts through the full review path.
+- [x] Add an opt-in full-path integration test using real Docker-produced artifacts.
+- [ ] Run the integration test against a digest-pinned worker image.
