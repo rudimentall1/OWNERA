@@ -95,6 +95,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Deliver work and independent quality review
 - [x] Add owner-attested partial receipt ledger with accepted-amount caps, idempotency, and atomic event persistence
 - [x] Reconcile receipt rows against hash-chained event evidence
+- [x] Add owner-authenticated settlement control with actor identity derived from verified principal
+- [ ] Bind receipt caps to canonical accepted-order amount and currency, not caller input
+- [ ] Integrate production identity provider and protected settlement API
 - [ ] Add independently verified payment-provider or on-chain settlement adapters
 - [ ] Verify settlement and calculate realized net profit/loss
 - [ ] Add a capped agent operating budget only after the workflow is proven
