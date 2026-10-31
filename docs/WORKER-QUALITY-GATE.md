@@ -1,6 +1,6 @@
 # Worker Quality Gate
 
-**Status:** Initial structured, evidence-bound review gate implemented. CI validation is pending for this commit.  
+**Status:** Initial structured, evidence-bound review gate implemented and CI-verified.  
 **Code:** `ownera/quality_gate.py`  
 **Tests:** `tests/test_quality_gate.py`
 
