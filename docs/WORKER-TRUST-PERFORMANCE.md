@@ -1,6 +1,6 @@
 # Worker Trust & Performance
 
-**Status:** Initial event-derived metrics implementation. Ruff and pytest CI passed on commit `bceee858` (216 passed, 9 skipped).
+**Status:** Initial event-derived metrics implementation. Ruff and pytest CI passed on commit `b33b916e` (216 passed, 9 skipped).
 **Code:** `ownera/worker_performance.py`
 **Tests:** `tests/test_worker_performance.py`
 
