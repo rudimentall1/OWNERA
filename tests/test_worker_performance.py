@@ -135,30 +135,24 @@ def test_unreviewed_attempt_is_not_falsely_marked_successful(tmp_path):
     assert builder.pending_review_attempts == 1
 
 
-def test_report_rejects_invalid_review_without_submission(monkeypatch, tmp_path):
-    workforce, _ = _setup(tmp_path)
-    task = _task()
-    workforce.add_task(task)
+def test_report_rejects_snapshot_when_event_history_advances(tmp_path):
+    workforce, database = _setup(tmp_path)
     events = workforce.repository.event_store
-    original_load = events.load
+    events.append(
+        aggregate_type="workforce",
+        aggregate_id="primary",
+        event_type="TaskReviewAccepted",
+        payload={
+            "task_id": "00000000-0000-0000-0000-000000000001",
+            "reviewer_id": "reviewer",
+            "accepted": True,
+            "findings": [],
+            "reviewed_at": None,
+        },
+        expected_version=workforce.event_version,
+        idempotency_key="out-of-band-review-event",
+    )
 
-    def broken_load(aggregate_type, aggregate_id):
-        history = list(original_load(aggregate_type, aggregate_id))
-        history.append(type(history[-1])(
-            event_id=history[-1].event_id,
-            aggregate_type="workforce",
-            aggregate_id="primary",
-            version=history[-1].version + 1,
-            event_type="TaskReviewAccepted",
-            payload={"task_id": str(task.task_id), "accepted": True},
-            occurred_at=history[-1].occurred_at,
-            idempotency_key=None,
-            previous_hash=history[-1].event_hash,
-            event_hash="0" * 64,
-        ))
-        return tuple(history)
-
-    monkeypatch.setattr(events, "verify", lambda *_args: True)
-    monkeypatch.setattr(events, "load", broken_load)
-    with pytest.raises(WorkerPerformanceError, match="no preceding submission"):
-        WorkerPerformanceService(workforce).build_report()
+    refreshed = PersistentWorkforce(database)
+    with pytest.raises(WorkerPerformanceError, match="snapshot version does not match"):
+        WorkerPerformanceService(refreshed).build_report()
