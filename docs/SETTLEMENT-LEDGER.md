@@ -31,10 +31,11 @@ bank connector, on-chain transaction verifier, invoice lifecycle, refund or
 chargeback model, or automatic reconciliation yet. Do not report these records
 as independently verified revenue.
 
-The event chain is tamper-evident, not tamper-proof. This first increment does
-not yet reconcile the receipt table against event payloads after database-level
-tampering. It is a local, single-node SQLite ledger, not a distributed
-accounting system.
+The event chain is tamper-evident, not tamper-proof. The ledger verification
+method compares each receipt row with its corresponding event and detects
+row-level changes or missing/extra records. It does not protect against an
+attacker who can rewrite both the database rows and the event chain. It is a
+local, single-node SQLite ledger, not a distributed accounting system.
 
 ## Next acceptance boundary
 
