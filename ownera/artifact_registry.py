@@ -175,9 +175,12 @@ class SQLiteArtifactRegistry:
             )
             row = connection.execute(
                 """
-                SELECT sha256, size_bytes, task_id, worker_id, artifact_name, media_type, created_at
-                FROM worker_artifact_records
-                WHERE task_id = ? AND worker_id = ? AND artifact_name = ? AND sha256 = ?
+                SELECT r.sha256, b.size_bytes, r.task_id, r.worker_id,
+                       r.artifact_name, r.media_type, r.created_at
+                FROM worker_artifact_records AS r
+                JOIN worker_artifact_blobs AS b ON b.sha256 = r.sha256
+                WHERE r.task_id = ? AND r.worker_id = ?
+                  AND r.artifact_name = ? AND r.sha256 = ?
                 """,
                 (task_id, worker_id, artifact_name, digest),
             ).fetchone()
@@ -213,10 +216,12 @@ class SQLiteArtifactRegistry:
         try:
             rows = connection.execute(
                 """
-                SELECT sha256, size_bytes, task_id, worker_id, artifact_name, media_type, created_at
-                FROM worker_artifact_records
-                WHERE task_id = ?
-                ORDER BY created_at, record_id
+                SELECT r.sha256, b.size_bytes, r.task_id, r.worker_id,
+                       r.artifact_name, r.media_type, r.created_at
+                FROM worker_artifact_records AS r
+                JOIN worker_artifact_blobs AS b ON b.sha256 = r.sha256
+                WHERE r.task_id = ?
+                ORDER BY r.created_at, r.record_id
                 """,
                 (task_id,),
             ).fetchall()
