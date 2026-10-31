@@ -208,8 +208,8 @@ def test_artifact_collection_rejects_symlinked_final_file(monkeypatch, tmp_path)
 def test_artifact_collection_copies_workspace_once_and_returns_regular_file(
     monkeypatch, tmp_path
 ):
-    from types import SimpleNamespace
     from pathlib import Path
+    from types import SimpleNamespace
 
     runtime = DockerWorkerRuntime(IMAGE)
     calls = []
