@@ -67,6 +67,8 @@ class WorkerExecutionService:
             raise WorkerExecutionFailed("task must be IN_PROGRESS before runtime execution")
         if task.assigned_worker_id != worker_id:
             raise WorkerExecutionFailed("only the assigned worker may execute this task")
+        if actual_cost > task.budget_limit:
+            raise WorkerExecutionFailed("declared execution cost exceeds the task budget")
 
         result = self.runtime.execute(request)
         if result.task_id != request.task_id:
@@ -77,6 +79,8 @@ class WorkerExecutionService:
             )
         if not result.artifacts:
             raise WorkerExecutionFailed("successful execution produced no registered artifacts")
+        if not set(result.artifacts).issubset(set(request.artifact_paths)):
+            raise WorkerExecutionFailed("runtime returned an artifact that was not requested")
 
         records: list[ArtifactRecord] = []
         refs: list[str] = []
