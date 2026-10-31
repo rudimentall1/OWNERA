@@ -33,7 +33,7 @@ No HTTP endpoint, object-store replication, retention/deletion policy, malware s
 - [x] Metadata survives registry reopen.
 - [x] Path-like artifact names and unsafe identifiers are rejected.
 - [x] Per-artifact size limit is enforced.
-- [ ] Run unit tests and CI on the repository commit.
+- [x] Run artifact-registry unit tests and CI on the repository commit.
 - [x] Integrate runtime outputs into the registry through the initial submission bridge.
 - [x] Bind artifact digests into the persisted TaskSubmitted event through the submission bridge.
 - [ ] Add independent reviewer-side artifact loading and digest verification.
