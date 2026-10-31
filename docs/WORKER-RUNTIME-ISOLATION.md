@@ -65,10 +65,13 @@ The image must contain Python 3 and must be trusted by the operator. The workflo
 does not choose or silently update the image.
 
 The integration suite exercises real Docker behavior for network isolation, host-file separation, read-only inputs, artifact export,
-process and memory limits, timeout, output limits, and symlink-artifact rejection. These tests are not part of the default unit
+process and memory limits, timeout, output limits, and symlink-artifact rejection.
+It now also includes a full vertical-slice test: real container execution, content-addressed artifact registration, independent artifact loading, criterion-level Quality Gate review, and persisted task acceptance. This test is present but has not yet been run against a live Docker daemon. These tests are not part of the default unit
 suite because they require a Docker daemon and an explicitly selected image.
 A successful workflow run is evidence for that exact image and runner
 configuration only; it is not a general proof against kernel or daemon escapes.
+For a reproducible initial harness run, the Docker Official Image `python:3.11.18-slim-bookworm` was observed with multi-platform index digest `sha256:ef521de1d817dc92a6358c906bbadb9a0b7e38040038642833521b9d582c2233` on 2026-10-31 ([Docker Hub image details](https://hub.docker.com/layers/library/python/3.11.18-slim-bookworm/images/sha256-061c190f3d5815b341a18dfe8a45771f8ba68c15a607ea56997fde3009ac4eec)). This is a functional test baseline only, not a production-approved hardened image.
+
 
 ## Next gates
 
