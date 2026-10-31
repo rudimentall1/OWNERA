@@ -159,3 +159,72 @@ def test_cleanup_runs_when_artifact_collection_fails(monkeypatch):
             )
         )
     assert cleaned == [True]
+
+
+def test_artifact_collection_rejects_symlinked_parent_directory(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    runtime = DockerWorkerRuntime(IMAGE)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("hostile target", encoding="utf-8")
+
+    def fake_run(args, **kwargs):
+        destination = __import__("pathlib").Path(args[-1])
+        (destination / "linked").symlink_to(outside, target_is_directory=True)
+        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr("ownera.worker_runtime.subprocess.run", fake_run)
+
+    with pytest.raises(WorkerRuntimeError, match="symbolic link"):
+        runtime._collect_artifacts(
+            "/usr/bin/docker", "container-id", ("linked/secret.txt",)
+        )
+
+
+def test_artifact_collection_rejects_symlinked_final_file(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from pathlib import Path
+
+    runtime = DockerWorkerRuntime(IMAGE)
+    outside = tmp_path / "secret.txt"
+    outside.write_text("hostile target", encoding="utf-8")
+
+    def fake_run(args, **kwargs):
+        destination = Path(args[-1])
+        (destination / "leak.txt").symlink_to(outside)
+        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr("ownera.worker_runtime.subprocess.run", fake_run)
+
+    with pytest.raises(WorkerRuntimeError, match="symbolic link"):
+        runtime._collect_artifacts(
+            "/usr/bin/docker", "container-id", ("leak.txt",)
+        )
+
+
+def test_artifact_collection_copies_workspace_once_and_returns_regular_file(
+    monkeypatch, tmp_path
+):
+    from types import SimpleNamespace
+    from pathlib import Path
+
+    runtime = DockerWorkerRuntime(IMAGE)
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        destination = Path(args[-1])
+        (destination / "report").mkdir()
+        (destination / "report" / "result.txt").write_bytes(b"verified")
+        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr("ownera.worker_runtime.subprocess.run", fake_run)
+
+    result = runtime._collect_artifacts(
+        "/usr/bin/docker", "container-id", ("report/result.txt",)
+    )
+
+    assert result == {"report/result.txt": b"verified"}
+    assert len(calls) == 1
+    assert calls[0][2] == "container-id:/workspace/."
