@@ -93,6 +93,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Add permitted source adapters and discover real paid work
 - [ ] Owner-approved contracts and customer commitments
 - [ ] Deliver work and independent quality review
+- [x] Add owner-attested partial receipt ledger with accepted-amount caps, idempotency, and atomic event persistence
+- [x] Reconcile receipt rows against hash-chained event evidence
+- [ ] Add independently verified payment-provider or on-chain settlement adapters
 - [ ] Verify settlement and calculate realized net profit/loss
 - [ ] Add a capped agent operating budget only after the workflow is proven
 
