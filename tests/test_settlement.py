@@ -163,8 +163,15 @@ def test_receipt_rejects_invalid_evidence_digest_and_naive_timestamp(tmp_path):
     with pytest.raises(ValueError, match="SHA-256"):
         _record(ledger, order_id, evidence_sha256="not-a-digest")
     with pytest.raises(ValueError, match="timezone-aware"):
-        _record(
-            ledger, order_id, idempotency_key="receipt-2",
+        ledger._record_receipt(
+            order_id=order_id,
+            accepted_amount=Decimal("1000"),
+            amount=Decimal("50"),
+            currency="EUR",
+            payment_reference="internal-test",
+            evidence_sha256="b" * 64,
+            recorded_by="owner-test",
+            idempotency_key="receipt-naive",
             recorded_at=datetime(2026, 10, 31),
         )
 
