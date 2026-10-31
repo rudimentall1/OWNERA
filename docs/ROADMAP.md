@@ -85,6 +85,7 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Attribute repeated submissions to the worker on each submission event, including rework cycles
 - [x] Reject stale workforce snapshots that diverge from event history
 - [x] Scope lifecycle idempotency keys to aggregate transition versions
+- [x] Add full-path real-Docker integration coverage from execution through artifact registry and independent quality acceptance
 - [ ] Validate the complete quality gate against real Docker-produced work artifacts
 - [ ] Run independent review against real Docker-produced artifacts
 - [x] Connect runtime outputs to the artifact registry and persist digest references in task submission evidence
