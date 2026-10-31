@@ -55,7 +55,11 @@ def test_report_uses_reviewed_attempts_and_costs_from_event_history(tmp_path):
     workforce, database = _setup(tmp_path)
     first = _task("First")
     workforce.add_task(first)
+    blocker = _task("Occupy first worker")
+    workforce.add_task(blocker)
     _complete_attempt(workforce, first, "builder-a", accepted=False, cost="12")
+    workforce.assign(blocker.task_id)
+    workforce.start(blocker.task_id, "builder-a")
     reassigned = workforce.assign(first.task_id)
     assert reassigned.status is TaskStatus.ASSIGNED
     workforce.start(first.task_id, "builder-b")
