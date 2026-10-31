@@ -4,6 +4,7 @@ import pytest
 
 from ownera.persistent_workforce import PersistentWorkforce
 from ownera.worker_performance import (
+    CurrencyCost,
     WorkerPerformanceError,
     WorkerPerformanceService,
 )
@@ -72,7 +73,7 @@ def test_report_uses_reviewed_attempts_and_costs_from_event_history(tmp_path):
     assert by_id["builder-a"].submitted_attempts == 1
     assert by_id["builder-a"].rework_attempts == 1
     assert by_id["builder-a"].acceptance_rate == 0.0
-    assert by_id["builder-a"].costs_by_currency == ()
+    assert by_id["builder-a"].costs_by_currency[0].total == Decimal("12")
     assert by_id["builder-b"].submitted_attempts == 1
     assert by_id["builder-b"].accepted_attempts == 1
     assert by_id["builder-b"].acceptance_rate == 1.0
@@ -109,7 +110,7 @@ def test_metrics_are_separated_by_currency(tmp_path):
     report = WorkerPerformanceService(workforce).build_report()
     builder = next(item for item in report.workers if item.worker_id == "builder-a")
 
-    assert builder.costs_by_currency == (type(builder.costs_by_currency[0])("EUR", Decimal("9")),)
+    assert builder.costs_by_currency == (CurrencyCost("EUR", Decimal("9")),)
 
 
 def test_unreviewed_attempt_is_not_falsely_marked_successful(tmp_path):
@@ -153,6 +154,7 @@ def test_report_rejects_invalid_review_without_submission(monkeypatch, tmp_path)
         ))
         return tuple(history)
 
+    monkeypatch.setattr(events, "verify", lambda *_args: True)
     monkeypatch.setattr(events, "load", broken_load)
-    with pytest.raises(WorkerPerformanceError, match="invalid reviewer_id|no preceding submission"):
+    with pytest.raises(WorkerPerformanceError, match="no preceding submission"):
         WorkerPerformanceService(workforce).build_report()
