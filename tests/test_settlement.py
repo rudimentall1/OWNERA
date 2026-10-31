@@ -14,7 +14,7 @@ from ownera.settlement import (
 )
 
 
-class TestAuthenticator:
+class StaticAuthenticator:
     def __init__(self, principals):
         self.principals = principals
 
@@ -51,7 +51,7 @@ def _record(ledger, order_id, **overrides):
     }
     values.update(overrides)
     control = OwnerSettlementControl(
-        ledger, TestAuthenticator({"valid-token": _principal()})
+        ledger, StaticAuthenticator({"valid-token": _principal()})
     )
     values.pop("recorded_by")
     return control.record_receipt("valid-token", **values)
@@ -179,7 +179,7 @@ def test_receipt_actor_is_derived_from_authenticated_owner(tmp_path):
 def test_non_owner_cannot_record_receipts(tmp_path, roles):
     ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
     control = OwnerSettlementControl(
-        ledger, TestAuthenticator({"limited": _principal(roles=roles)})
+        ledger, StaticAuthenticator({"limited": _principal(roles=roles)})
     )
 
     order_id = uuid4()
@@ -200,9 +200,9 @@ def test_non_owner_cannot_record_receipts(tmp_path, roles):
 
 def test_invalid_and_expired_credentials_cannot_record_receipts(tmp_path):
     ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
-    invalid = OwnerSettlementControl(ledger, TestAuthenticator({}))
+    invalid = OwnerSettlementControl(ledger, StaticAuthenticator({}))
     expired = OwnerSettlementControl(
-        ledger, TestAuthenticator({"expired": _principal(expired=True)})
+        ledger, StaticAuthenticator({"expired": _principal(expired=True)})
     )
     args = {
         "order_id": uuid4(),
@@ -220,3 +220,21 @@ def test_invalid_and_expired_credentials_cannot_record_receipts(tmp_path):
         expired.record_receipt("expired", **args)
 
     assert ledger.list_for_order(args["order_id"]) == ()
+
+
+
+def test_malformed_authenticator_result_fails_closed(tmp_path):
+    ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
+    control = OwnerSettlementControl(ledger, StaticAuthenticator({"malformed": None}))
+
+    with pytest.raises(OwnerControlError, match="invalid principal"):
+        control.record_receipt(
+            "malformed",
+            order_id=uuid4(),
+            accepted_amount=Decimal("100"),
+            amount=Decimal("50"),
+            currency="EUR",
+            payment_reference="ref",
+            evidence_sha256="a" * 64,
+            idempotency_key="malformed-1",
+        )
