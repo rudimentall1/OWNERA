@@ -67,7 +67,6 @@ class OwnerSettlementControl:
         payment_reference: str,
         evidence_sha256: str,
         idempotency_key: str,
-        recorded_at: datetime | None = None,
     ) -> ReceiptRecord:
         owner = self._owner(credential)
         try:
@@ -77,7 +76,9 @@ class OwnerSettlementControl:
             accepted_amount = Decimal(evidence["accepted_amount"])
             currency = str(evidence["currency"]).upper()
         except Exception as exc:
-            raise OwnerControlError("canonical accepted-order evidence is unavailable or invalid") from exc
+            raise OwnerControlError(
+                "canonical accepted-order evidence is unavailable or invalid"
+            ) from exc
         return self._ledger._record_receipt(
             order_id=order_id,
             accepted_amount=accepted_amount,
@@ -87,5 +88,4 @@ class OwnerSettlementControl:
             evidence_sha256=evidence_sha256,
             recorded_by=owner.subject,
             idempotency_key=idempotency_key,
-            recorded_at=recorded_at,
         )
