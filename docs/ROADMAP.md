@@ -96,7 +96,7 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add owner-attested partial receipt ledger with accepted-amount caps, idempotency, and atomic event persistence
 - [x] Reconcile receipt rows against hash-chained event evidence
 - [x] Add owner-authenticated settlement control with actor identity derived from verified principal
-- [ ] Bind receipt caps to canonical accepted-order amount and currency, not caller input
+- [x] Bind receipt caps to canonical accepted-order amount and currency from persisted handoff evidence
 - [ ] Integrate production identity provider and protected settlement API
 - [ ] Add independently verified payment-provider or on-chain settlement adapters
 - [ ] Verify settlement and calculate realized net profit/loss
