@@ -16,7 +16,8 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Mapping, Protocol
+from collections.abc import Mapping
+from typing import Protocol
 from uuid import uuid4
 
 
@@ -337,8 +338,8 @@ class DockerWorkerRuntime:
             root = Path(output_dir)
             copied = subprocess.run(
                 [docker, "cp", f"{container_name}:/workspace/.", str(root)],
-                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, timeout=30, check=False,
+                stdin=subprocess.DEVNULL, capture_output=True,
+                timeout=30, check=False,
             )
             if copied.returncode != 0:
                 raise WorkerRuntimeError("could not collect worker workspace")
