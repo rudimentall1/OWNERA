@@ -56,7 +56,7 @@ A successful process exit is not task acceptance. The existing independent revie
 
 A manually triggered GitHub Actions workflow is available at
 `.github/workflows/worker-runtime-integration.yml`. It accepts only a worker
-image reference pinned by a lowercase SHA-256 digest, pulls that exact image,
+image reference pinned by a lowercase SHA-256 digest, defaults to the reviewed-for-test-harness Docker Official Image digest documented below, and pulls that exact image,
 and runs the opt-in tests in `tests/integration/test_docker_worker_runtime.py`.
 
 Run it from GitHub Actions → Worker Runtime Integration → Run workflow. Supply
