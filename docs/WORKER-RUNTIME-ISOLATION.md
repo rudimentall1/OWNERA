@@ -52,11 +52,30 @@ The Docker image must already be available locally. Runtime provisioning, image 
 
 A successful process exit is not task acceptance. The existing independent reviewer and acceptance criteria remain mandatory.
 
+## Real-container acceptance harness
+
+A manually triggered GitHub Actions workflow is available at
+`.github/workflows/worker-runtime-integration.yml`. It accepts only a worker
+image reference pinned by a lowercase SHA-256 digest, pulls that exact image,
+and runs the opt-in tests in `tests/integration/test_docker_worker_runtime.py`.
+
+Run it from GitHub Actions → Worker Runtime Integration → Run workflow. Supply
+a trusted image reference in the form `repository/image:tag@sha256:<64 hex>`.
+The image must contain Python 3 and must be trusted by the operator. The workflow
+does not choose or silently update the image.
+
+The integration suite exercises real Docker behavior for network isolation,
+host-file separation, read-only inputs, artifact export, timeout, output limits,
+and symlink-artifact rejection. These tests are not part of the default unit
+suite because they require a Docker daemon and an explicitly selected image.
+A successful workflow run is evidence for that exact image and runner
+configuration only; it is not a general proof against kernel or daemon escapes.
+
 ## Next gates
 
-1. Run this adapter on a dedicated Linux runner with rootless Docker or an equivalent hardened container runtime.
-2. Add real-container adversarial tests for network access, host-file access, process exhaustion, memory exhaustion, output flooding, timeout, and artifact path attacks.
-3. Verify container termination and cleanup after forced runner/process failure.
-4. Add image signature and vulnerability-policy enforcement.
+1. Run the real-container workflow with a reviewed, digest-pinned Python image.
+2. Add process and memory exhaustion tests plus forced runner/process-failure cleanup tests.
+3. Verify the runner uses rootless Docker or an equivalent hardened runtime on a dedicated Linux host.
+4. Add image signature verification and vulnerability-policy enforcement.
 5. Connect execution to the task lifecycle only after runtime acceptance tests pass.
 6. Add per-task cost and resource accounting before any autonomous budget expansion.
