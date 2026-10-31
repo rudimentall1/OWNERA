@@ -11,7 +11,7 @@ Worker performance is derived from the append-only workforce event history, not 
 ## Metrics
 
 Per registered worker:
-- task starts;
+- task start attempts;
 - submitted execution attempts;
 - reviewed attempts;
 - accepted attempts;
