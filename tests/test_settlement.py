@@ -55,7 +55,6 @@ def _record(ledger, order_id, **overrides):
         "evidence_sha256": "a" * 64,
         "recorded_by": "owner-1",
         "idempotency_key": "receipt-1",
-        "recorded_at": datetime(2026, 10, 31, tzinfo=timezone.utc),
     }
     values.update(overrides)
     evidence = StaticOrderEvidence({
