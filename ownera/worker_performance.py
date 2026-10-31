@@ -58,6 +58,8 @@ class WorkerPerformanceService:
         event_store = self.workforce.repository.event_store
         verified = event_store.verify("workforce", self.workforce.AGGREGATE_ID)
         events = event_store.load("workforce", self.workforce.AGGREGATE_ID)
+        if self.workforce.version != self.workforce.event_version + 1:
+            raise WorkerPerformanceError("workforce snapshot version does not match event history")
         if len(events) != self.workforce.event_version:
             raise WorkerPerformanceError("workforce snapshot is stale relative to event history")
         profiles = {worker.worker_id: worker for worker in self.workforce.workers}
