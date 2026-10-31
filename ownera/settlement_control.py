@@ -30,6 +30,8 @@ class OwnerSettlementControl:
         except Exception as exc:
             raise OwnerControlError("owner authentication failed") from exc
 
+        if not isinstance(principal, AuthenticatedPrincipal):
+            raise OwnerControlError("authenticator returned an invalid principal")
         now = datetime.now(timezone.utc)
         if (
             not principal.issuer.strip()
