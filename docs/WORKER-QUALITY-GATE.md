@@ -6,7 +6,7 @@
 
 ## Decision contract
 
-A reviewer first obtains an `ArtifactReviewPacket` through `ArtifactReviewService`. The packet contains the original bytes after registry digest verification.
+The caller supplies only the task ID and reviewer ID. The gate itself reloads the `ArtifactReviewPacket` through `ArtifactReviewService` immediately before validation, so callers cannot forge packet contents or digest membership.
 
 For each task acceptance criterion, the reviewer submits exactly one `CriterionAssessment` with:
 - the exact criterion text;
