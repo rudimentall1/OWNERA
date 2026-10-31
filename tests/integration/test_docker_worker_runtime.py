@@ -12,13 +12,13 @@ from ownera.artifact_review import ArtifactReviewService
 from ownera.persistent_workforce import PersistentWorkforce
 from ownera.quality_gate import CriterionAssessment, QualityGateService
 from ownera.worker_execution import WorkerExecutionService
-from ownera.workforce import TaskStatus, WorkerProfile, WorkTask
 from ownera.worker_runtime import (
     DockerWorkerRuntime,
     RuntimeLimits,
     WorkerExecutionRequest,
     WorkerRuntimeError,
 )
+from ownera.workforce import TaskStatus, WorkerProfile, WorkTask
 
 IMAGE = os.environ.get("OWNERA_WORKER_IMAGE", "")
 pytestmark = pytest.mark.integration
@@ -222,9 +222,11 @@ def test_real_docker_execution_to_registry_review_and_quality_acceptance(tmp_pat
                 "python",
                 "-I",
                 "-c",
-                "from pathlib import Path; "
-                "spec=Path('/inputs/spec.txt').read_text(); "
-                "Path('/workspace/result.txt').write_text('DELIVERED: '+spec)",
+                (
+                    "from pathlib import Path; "
+                    "spec=Path('/inputs/spec.txt').read_text(); "
+                    "Path('/workspace/result.txt').write_text('DELIVERED: '+spec)"
+                ),
             ),
             input_files={"spec.txt": b"customer-approved-scope"},
             artifact_paths=("result.txt",),
