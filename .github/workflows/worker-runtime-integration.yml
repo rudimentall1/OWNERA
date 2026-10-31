@@ -1,0 +1,38 @@
+name: Worker Runtime Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker_image:
+        description: "Trusted prebuilt worker image pinned by @sha256:<64 lowercase hex>"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  docker-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate and pull digest-pinned image
+        env:
+          WORKER_IMAGE: ${{ inputs.worker_image }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$WORKER_IMAGE" =~ .+@sha256:[0-9a-f]{64}$ ]]; then
+            echo "worker_image must end with @sha256:<64 lowercase hex>" >&2
+            exit 1
+          fi
+          docker pull "$WORKER_IMAGE"
+      - name: Install test dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Run real Docker isolation acceptance tests
+        env:
+          OWNERA_WORKER_IMAGE: ${{ inputs.worker_image }}
+        run: pytest -q -m integration tests/integration/test_docker_worker_runtime.py
