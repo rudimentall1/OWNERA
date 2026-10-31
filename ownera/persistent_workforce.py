@@ -224,7 +224,7 @@ class PersistentWorkforce:
                 expected_event_version=self._event_version,
                 event_type=event_type,
                 payload=payload,
-                idempotency_key=f"{event_type}:{self.AGGREGATE_ID}:{digest}",
+                idempotency_key=f"{event_type}:{self.AGGREGATE_ID}:v{self._version}:{digest}",
             )
             self._event_version = event.version
             return result
