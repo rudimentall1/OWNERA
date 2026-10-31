@@ -57,7 +57,8 @@ class SQLiteSettlementLedger:
             raise ValueError("settlement ledger requires a file-backed database")
         Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
         self.event_store = SQLiteEventStore(database_path)
-        with self._connect() as connection:
+        connection = self._connect()
+        try:
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS settlement_receipts (
                     receipt_id TEXT PRIMARY KEY,
@@ -78,6 +79,8 @@ class SQLiteSettlementLedger:
                 CREATE INDEX IF NOT EXISTS idx_settlement_receipts_order
                 ON settlement_receipts(order_id, recorded_at)
             """)
+        finally:
+            connection.close()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(
@@ -211,12 +214,15 @@ class SQLiteSettlementLedger:
             connection.close()
 
     def list_for_order(self, order_id: UUID) -> tuple[ReceiptRecord, ...]:
-        with self._connect() as connection:
+        connection = self._connect()
+        try:
             rows = connection.execute(
                 """SELECT * FROM settlement_receipts
                    WHERE order_id = ? ORDER BY recorded_at, receipt_id""",
                 (str(order_id),),
             ).fetchall()
+        finally:
+            connection.close()
         return tuple(self._to_record(row) for row in rows)
 
     def total_owner_attested(self, order_id: UUID) -> Decimal:
