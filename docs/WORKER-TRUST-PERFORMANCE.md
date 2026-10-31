@@ -1,6 +1,6 @@
 # Worker Trust & Performance
 
-**Status:** Initial event-derived metrics implementation. CI validation pending.
+**Status:** Initial event-derived metrics implementation. Ruff and pytest CI passed on commit `bceee858` (216 passed, 8 skipped).
 **Code:** `ownera/worker_performance.py`
 **Tests:** `tests/test_worker_performance.py`
 
@@ -36,6 +36,7 @@ These are descriptive labels only. They do not authorize tool access, money move
 ## Boundaries and known limitations
 
 - The event chain is tamper-evident, not tamper-proof; an attacker with database rewrite access may rewrite the entire chain unless an external checkpoint exists.
+- The report rejects snapshot/event-version divergence. Lifecycle idempotency keys include the snapshot version so a legitimate later retry/rework transition with the same payload is not collapsed into an earlier event.
 - Cost figures are worker-submitted actual_cost values, not independently verified invoices or payments.
 - Acceptance reflects the recorded reviewer decision, not an objective guarantee of quality.
 - Historical attribution is based on the worker ID in each submission event.
@@ -49,5 +50,5 @@ These are descriptive labels only. They do not authorize tool access, money move
 - [x] Separate accepted, rework, and pending attempts.
 - [x] Keep costs separated by currency.
 - [x] Avoid trust labels for small samples.
-- [ ] Run unit tests and CI for this implementation.
+- [x] Run unit tests and CI for this implementation.
 - [ ] Add external event-chain checkpoints and independently verified cost/settlement evidence.
