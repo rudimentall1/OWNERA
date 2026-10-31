@@ -77,6 +77,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Deploy on a hardened runner and pass adversarial isolation tests
 - [x] Add SQLite content-addressed worker artifact registry with deduplication, task provenance, size bounds, and read-time SHA-256 verification
 - [x] Run artifact-registry and execution-bridge unit tests and confirm CI
+- [x] Add independent reviewer-side artifact loading, task/worker provenance checks, and SHA-256 verification
+- [x] Run reviewer-side artifact tests and confirm CI
+- [ ] Run independent review against real Docker-produced artifacts
 - [x] Connect runtime outputs to the artifact registry and persist digest references in task submission evidence
 - [ ] Run the complete path against a real digest-pinned Docker image
 - [ ] Add permitted source adapters and discover real paid work
