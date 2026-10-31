@@ -90,6 +90,10 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Run independent review against real Docker-produced artifacts
 - [x] Connect runtime outputs to the artifact registry and persist digest references in task submission evidence
 - [ ] Run the complete path against a real digest-pinned Docker image
+- [x] Add SQLite commercial evidence capture with bounded snapshots, SHA-256 digests, and PENDING-by-default records
+- [x] Add authenticated owner evidence review with reviewer identity binding and per-evidence hash-chained audit
+- [x] Add fail-closed evidence reference validation for accepted evidence belonging to the opportunity
+- [ ] Enforce accepted evidence as a mandatory gate inside persistent commercial qualification
 - [ ] Add permitted source adapters and discover real paid work
 - [ ] Owner-approved contracts and customer commitments
 - [ ] Deliver work and independent quality review
