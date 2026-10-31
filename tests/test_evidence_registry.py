@@ -181,3 +181,34 @@ def test_review_rejects_future_timestamp(registry):
             accept=True,
             now=datetime.now(timezone.utc) + timedelta(minutes=1),
         )
+
+
+def test_verify_detects_source_metadata_row_tampering(registry):
+    item = _capture(registry)
+    connection = registry._connect()
+    try:
+        connection.execute(
+            "UPDATE opportunity_evidence SET source_url=? WHERE evidence_id=?",
+            ("https://attacker.example/forged", str(item.evidence_id)),
+        )
+    finally:
+        connection.close()
+
+    with pytest.raises(EvidenceIntegrityError, match="capture event"):
+        registry.verify(item.evidence_id)
+
+
+def test_verify_detects_review_identity_row_tampering(registry):
+    item = _capture(registry)
+    registry.review("valid", item.evidence_id, accept=True)
+    connection = registry._connect()
+    try:
+        connection.execute(
+            "UPDATE opportunity_evidence SET reviewed_by=? WHERE evidence_id=?",
+            ("forged-reviewer", str(item.evidence_id)),
+        )
+    finally:
+        connection.close()
+
+    with pytest.raises(EvidenceIntegrityError, match="review event"):
+        registry.verify(item.evidence_id)
