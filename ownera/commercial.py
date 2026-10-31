@@ -139,7 +139,11 @@ class CommercialEvidenceGate(Protocol):
     """Validates that an opportunity's evidence was accepted by its owner."""
 
     def require_accepted(
-        self, opportunity_id: UUID, evidence_refs: tuple[str, ...]
+        self,
+        opportunity_id: UUID,
+        evidence_refs: tuple[str, ...],
+        *,
+        expected_source_url: str | None = None,
     ) -> None:
         ...
 
@@ -194,7 +198,9 @@ class CommercialEngine:
         if self._evidence_gate is not None:
             try:
                 self._evidence_gate.require_accepted(
-                    opportunity.opportunity_id, opportunity.evidence_refs
+                    opportunity.opportunity_id,
+                    opportunity.evidence_refs,
+                    expected_source_url=opportunity.source_url,
                 )
             except Exception:
                 reasons.append("evidence_not_owner_accepted")
