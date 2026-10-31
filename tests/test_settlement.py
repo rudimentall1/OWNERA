@@ -1,15 +1,40 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
+from ownera.owner_control import AuthenticatedPrincipal, OwnerControlError
+from ownera.settlement_control import OwnerSettlementControl
 from ownera.settlement import (
     ReceiptConflict,
     ReceiptLimitExceeded,
     SettlementIntegrityError,
     SQLiteSettlementLedger,
 )
+
+
+class TestAuthenticator:
+    def __init__(self, principals):
+        self.principals = principals
+
+    def authenticate(self, credential):
+        if credential not in self.principals:
+            raise ValueError("invalid credential")
+        return self.principals[credential]
+
+
+def _principal(*, roles=frozenset({"owner:settlement"}), expired=False):
+    now = datetime.now(timezone.utc)
+    return AuthenticatedPrincipal(
+        issuer="https://identity.example.test",
+        subject="owner-42",
+        roles=roles,
+        authenticated_at=now - timedelta(seconds=1),
+        expires_at=now - timedelta(seconds=1) if expired else now + timedelta(minutes=5),
+        authentication_method="webauthn",
+        session_id="session-settlement",
+    )
 
 
 def _record(ledger, order_id, **overrides):
@@ -25,7 +50,11 @@ def _record(ledger, order_id, **overrides):
         "recorded_at": datetime(2026, 10, 31, tzinfo=timezone.utc),
     }
     values.update(overrides)
-    return ledger.record_receipt(**values)
+    control = OwnerSettlementControl(
+        ledger, TestAuthenticator({"valid-token": _principal()})
+    )
+    values.pop("recorded_by")
+    return control.record_receipt("valid-token", **values)
 
 
 def test_owner_attested_receipt_persists_and_verifies_event_chain(tmp_path):
@@ -133,3 +162,60 @@ def test_receipt_and_event_are_committed_atomically(tmp_path):
     # the changed financial amount.
     with pytest.raises(SettlementIntegrityError, match="differs from event"):
         ledger.verify(order_id)
+
+
+
+def test_receipt_actor_is_derived_from_authenticated_owner(tmp_path):
+    ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
+    receipt = _record(ledger, uuid4())
+
+    assert receipt.recorded_by == "owner-42"
+
+
+@pytest.mark.parametrize(
+    "roles",
+    [frozenset(), frozenset({"customer"}), frozenset({"worker"}), frozenset({"owner:read"})],
+)
+def test_non_owner_cannot_record_receipts(tmp_path, roles):
+    ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
+    control = OwnerSettlementControl(
+        ledger, TestAuthenticator({"limited": _principal(roles=roles)})
+    )
+
+    with pytest.raises(OwnerControlError, match="permission required"):
+        control.record_receipt(
+            "limited",
+            order_id=uuid4(),
+            accepted_amount=Decimal("100"),
+            amount=Decimal("50"),
+            currency="EUR",
+            payment_reference="ref",
+            evidence_sha256="a" * 64,
+            idempotency_key="limited-1",
+        )
+
+    assert ledger.list_for_order(uuid4()) == ()
+
+
+def test_invalid_and_expired_credentials_cannot_record_receipts(tmp_path):
+    ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
+    invalid = OwnerSettlementControl(ledger, TestAuthenticator({}))
+    expired = OwnerSettlementControl(
+        ledger, TestAuthenticator({"expired": _principal(expired=True)})
+    )
+    args = {
+        "order_id": uuid4(),
+        "accepted_amount": Decimal("100"),
+        "amount": Decimal("50"),
+        "currency": "EUR",
+        "payment_reference": "ref",
+        "evidence_sha256": "a" * 64,
+        "idempotency_key": "invalid-1",
+    }
+
+    with pytest.raises(OwnerControlError, match="authentication failed"):
+        invalid.record_receipt("forged", **args)
+    with pytest.raises(OwnerControlError, match="invalid or expired"):
+        expired.record_receipt("expired", **args)
+
+    assert ledger.list_for_order(args["order_id"]) == ()
