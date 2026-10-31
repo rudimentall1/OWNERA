@@ -1,6 +1,6 @@
 # Commercial Opportunity Evidence Registry
 
-**Status:** Initial SQLite evidence capture, owner review, and integrity verification are implemented. The registry is not yet wired into `CommercialEngine.assess()`; qualification can still use legacy evidence references unless the caller explicitly invokes `require_accepted()`.  
+**Status:** SQLite evidence capture, owner review, integrity verification, and an optional fail-closed gate in persistent commercial qualification are implemented. The gate is enforced when `PersistentCommercialEngine` is constructed with the registry; legacy callers that omit the gate retain the previous behavior.  
 **Code:** `ownera/evidence_registry.py`  
 **Tests:** `tests/test_evidence_registry.py`
 
@@ -31,12 +31,11 @@ The registry turns an opportunity's source material into a durable reviewable re
 - `require_accepted(opportunity_id, evidence_refs)` fails closed unless every reference is a registry UUID, belongs to the same opportunity, is ACCEPTED, and still matches its content digest.
 - `verify(evidence_id)` checks the content digest and event hash chain.
 
-The caller must pass registry evidence UUIDs to `require_accepted`. Existing commercial records that use source URLs as evidence references are not silently upgraded or treated as reviewed.
+The persistent commercial engine accepts an `evidence_gate` dependency. When supplied, every assessment must pass `require_accepted` before it can become `QUALIFIED`. A missing, pending, rejected, mismatched, or integrity-failed evidence reference results in `NEEDS_REVIEW`. Existing commercial records that use source URLs as evidence references are not silently upgraded or treated as reviewed; they remain blocked by the gate until evidence is recaptured and reviewed.
 
 ## Remaining integration gates
 
-1. Wire the registry into the persistent commercial workflow so qualification cannot reach `QUALIFIED` without accepted evidence.
-2. Make evidence references immutable after capture or introduce explicit superseding evidence.
-3. Add source-specific capture adapters only after confirming permitted access and retention terms.
-4. Add production identity integration, session revocation, and phishing-resistant MFA.
-5. Add independent customer, contract, and payment verification. Owner-reviewed listing evidence is not settlement evidence.
+1. Make evidence references immutable after capture or introduce explicit superseding evidence.
+2. Add source-specific capture adapters only after confirming permitted access and retention terms.
+3. Add production identity integration, session revocation, and phishing-resistant MFA.
+4. Add independent customer, contract, and payment verification. Owner-reviewed listing evidence is not settlement evidence.
