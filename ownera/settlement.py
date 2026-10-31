@@ -29,6 +29,10 @@ class ReceiptLimitExceeded(SettlementError):
     """Recorded receipts would exceed the accepted order amount."""
 
 
+class SettlementIntegrityError(SettlementError):
+    """Receipt rows do not match their append-only event evidence."""
+
+
 @dataclass(frozen=True)
 class ReceiptRecord:
     receipt_id: UUID
@@ -222,7 +226,32 @@ class SQLiteSettlementLedger:
         )
 
     def verify(self, order_id: UUID) -> bool:
-        return self.event_store.verify("settlement_receipts", str(order_id))
+        aggregate_id = str(order_id)
+        self.event_store.verify("settlement_receipts", aggregate_id)
+        records = self.list_for_order(order_id)
+        events = self.event_store.load("settlement_receipts", aggregate_id)
+        if len(records) != len(events):
+            raise SettlementIntegrityError("receipt rows and event history differ in length")
+        by_id = {str(record.receipt_id): record for record in records}
+        if len(by_id) != len(records):
+            raise SettlementIntegrityError("duplicate receipt identifiers")
+        for event in events:
+            payload = event.payload
+            record = by_id.get(payload.get("receipt_id"))
+            if record is None:
+                raise SettlementIntegrityError("event references a missing receipt row")
+            expected = {
+                "amount": str(record.amount),
+                "accepted_amount": str(record.accepted_amount),
+                "currency": record.currency,
+                "payment_reference": record.payment_reference,
+                "evidence_sha256": record.evidence_sha256,
+                "recorded_by": record.recorded_by,
+                "verification_level": record.verification_level,
+            }
+            if any(payload.get(key) != value for key, value in expected.items()):
+                raise SettlementIntegrityError("receipt row differs from event evidence")
+        return True
 
     @staticmethod
     def _money(value: Decimal, name: str) -> Decimal:
