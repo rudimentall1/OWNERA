@@ -93,7 +93,7 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add SQLite commercial evidence capture with bounded snapshots, SHA-256 digests, and PENDING-by-default records
 - [x] Add authenticated owner evidence review with reviewer identity binding and per-evidence hash-chained audit
 - [x] Add fail-closed evidence reference validation for accepted evidence belonging to the opportunity
-- [ ] Enforce accepted evidence as a mandatory gate inside persistent commercial qualification
+- [x] Enforce accepted evidence as a mandatory gate inside persistent commercial qualification
 - [ ] Add permitted source adapters and discover real paid work
 - [ ] Owner-approved contracts and customer commitments
 - [ ] Deliver work and independent quality review
