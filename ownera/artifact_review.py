@@ -53,14 +53,12 @@ class ArtifactReviewService:
             (item for item in self.workforce.workers if item.worker_id == reviewer_id),
             None,
         )
-        if (
-            reviewer is None
-            or not reviewer.enabled
-            or "quality.review" not in reviewer.capabilities
-        ):
-            raise ArtifactReviewError("reviewer lacks the quality.review capability")
+        if reviewer is None or not reviewer.enabled:
+            raise ArtifactReviewError("reviewer is unknown or disabled")
         if reviewer_id == task.assigned_worker_id:
             raise ArtifactReviewError("worker cannot review its own artifacts")
+        if "quality.review" not in reviewer.capabilities:
+            raise ArtifactReviewError("reviewer lacks the quality.review capability")
         if not task.artifact_refs:
             raise ArtifactReviewError("task has no submitted artifact references")
 
