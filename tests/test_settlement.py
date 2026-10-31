@@ -5,13 +5,13 @@ from uuid import uuid4
 import pytest
 
 from ownera.owner_control import AuthenticatedPrincipal, OwnerControlError
-from ownera.settlement_control import OwnerSettlementControl
 from ownera.settlement import (
     ReceiptConflict,
     ReceiptLimitExceeded,
     SettlementIntegrityError,
     SQLiteSettlementLedger,
 )
+from ownera.settlement_control import OwnerSettlementControl
 
 
 class StaticOrderEvidence:
@@ -352,7 +352,7 @@ def test_receipt_fails_when_canonical_order_evidence_is_missing(tmp_path):
 def test_settlement_rejects_float_and_boolean_amounts(tmp_path, amount):
     ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
 
-    with pytest.raises(ValueError, match="float or boolean"):
+    with pytest.raises(TypeError, match="float or boolean"):
         ledger._record_receipt(
             order_id=uuid4(),
             accepted_amount=Decimal("100"),
