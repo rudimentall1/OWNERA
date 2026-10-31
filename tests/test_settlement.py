@@ -363,3 +363,76 @@ def test_settlement_rejects_float_and_boolean_amounts(tmp_path, amount):
             recorded_by="owner-test",
             idempotency_key="invalid-numeric",
         )
+
+
+
+def test_settlement_reads_real_persisted_order_handoff_evidence(tmp_path):
+    from ownera.commercial import ProposalDraft, ProposalStatus
+    from ownera.order_handoff import (
+        CustomerOrder,
+        OrderToWorkforceBridge,
+        TaskSpec,
+    )
+    from ownera.persistent_workforce import PersistentWorkforce
+
+    database = tmp_path / "ownera.sqlite3"
+    now = datetime.now(timezone.utc)
+    proposal = ProposalDraft(
+        opportunity_id=uuid4(),
+        scope="Deliver a small API integration.",
+        acceptance_criteria=("API works",),
+        delivery_plan=("Implement", "Review"),
+        quote_amount=Decimal("750"),
+        currency="EUR",
+        status=ProposalStatus.APPROVED_FOR_SUBMISSION,
+        owner_approved_by="owner-42",
+        owner_approved_at=now - timedelta(hours=2),
+    )
+    order = CustomerOrder(
+        proposal_id=proposal.proposal_id,
+        customer_id="customer-42",
+        accepted_amount=Decimal("750"),
+        currency="EUR",
+        customer_acceptance_ref="contract:sha256:example",
+        accepted_scope=proposal.scope,
+        accepted_acceptance_criteria=proposal.acceptance_criteria,
+        customer_accepted_at=now - timedelta(hours=1),
+        owner_approved_by="owner-42",
+        owner_approved_at=now - timedelta(hours=1, minutes=30),
+        execution_budget_limit=Decimal("500"),
+    )
+    workforce = PersistentWorkforce(database)
+    OrderToWorkforceBridge().convert(
+        order,
+        proposal,
+        (
+            TaskSpec(
+                title="Implement API",
+                description="Implement the accepted API scope.",
+                required_capabilities=frozenset({"python"}),
+                budget_limit=Decimal("500"),
+                acceptance_criteria=("Endpoint works",),
+            ),
+        ),
+        workforce,
+    )
+    ledger = SQLiteSettlementLedger(database)
+    control = OwnerSettlementControl(
+        ledger,
+        workforce.repository,
+        StaticAuthenticator({"valid": _principal()}),
+    )
+
+    receipt = control.record_receipt(
+        "valid",
+        order_id=order.order_id,
+        amount=Decimal("300"),
+        payment_reference="bank:transfer-789",
+        evidence_sha256="f" * 64,
+        idempotency_key="real-handoff-receipt",
+    )
+
+    assert receipt.accepted_amount == Decimal("750")
+    assert receipt.currency == "EUR"
+    assert receipt.recorded_by == "owner-42"
+    assert ledger.verify(order.order_id)
