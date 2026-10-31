@@ -15,8 +15,8 @@ import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
 from collections.abc import Mapping
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 from uuid import uuid4
 
