@@ -129,13 +129,30 @@ def test_idempotency_key_cannot_be_reused_for_different_receipt(tmp_path):
 def test_order_terms_cannot_change_between_receipts(tmp_path):
     ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
     order_id = uuid4()
-    _record(ledger, order_id)
+    evidence = StaticOrderEvidence({
+        order_id: {
+            "order_id": str(order_id),
+            "accepted_amount": "1000",
+            "currency": "EUR",
+        }
+    })
+    control = OwnerSettlementControl(
+        ledger, evidence, StaticAuthenticator({"valid": _principal()})
+    )
+    args = {
+        "order_id": order_id,
+        "amount": Decimal("100"),
+        "payment_reference": "wire-1",
+        "evidence_sha256": "a" * 64,
+        "idempotency_key": "receipt-1",
+    }
+    control.record_receipt("valid", **args)
+    evidence.orders[order_id]["accepted_amount"] = "1200"
 
     with pytest.raises(ReceiptConflict):
-        _record(
-            ledger, order_id, amount=Decimal("100"),
-            idempotency_key="receipt-2",
-            accepted_amount=Decimal("1200"),
+        control.record_receipt(
+            "valid",
+            **{**args, "idempotency_key": "receipt-2"},
         )
 
 
