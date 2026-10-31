@@ -132,3 +132,47 @@ def test_runtime_cannot_submit_artifact_for_another_task(tmp_path):
             actual_cost=Decimal("1"),
         )
     assert workforce.tasks[0].status.value == "IN_PROGRESS"
+
+
+def test_budget_is_checked_before_runtime_execution(tmp_path):
+    workforce, task = setup_workforce(tmp_path)
+    request = WorkerExecutionRequest(str(task.task_id), ("python", "-V"))
+    runtime = FakeRuntime(None)
+    service = WorkerExecutionService(
+        runtime=runtime,
+        registry=SQLiteArtifactRegistry(tmp_path / "artifacts.sqlite3"),
+        workforce=workforce,
+    )
+
+    with pytest.raises(WorkerExecutionFailed, match="exceeds the task budget"):
+        service.execute_and_submit(
+            request, worker_id="builder", summary="over budget",
+            actual_cost=Decimal("101"),
+        )
+    assert runtime.calls == 0
+
+
+def test_runtime_cannot_return_unrequested_artifact(tmp_path):
+    workforce, task = setup_workforce(tmp_path)
+    request = WorkerExecutionRequest(
+        str(task.task_id), ("python", "-V"), artifact_paths=("requested.txt",)
+    )
+    runtime = FakeRuntime(
+        WorkerExecutionResult(
+            task_id=str(task.task_id), status="SUCCEEDED", exit_code=0,
+            stdout="", stderr="", artifacts={"secret.txt": b"unexpected"},
+            duration_seconds=0.1,
+        )
+    )
+    service = WorkerExecutionService(
+        runtime=runtime,
+        registry=SQLiteArtifactRegistry(tmp_path / "artifacts.sqlite3"),
+        workforce=workforce,
+    )
+
+    with pytest.raises(WorkerExecutionFailed, match="not requested"):
+        service.execute_and_submit(
+            request, worker_id="builder", summary="unexpected output",
+            actual_cost=Decimal("1"),
+        )
+    assert workforce.tasks[0].status.value == "IN_PROGRESS"
