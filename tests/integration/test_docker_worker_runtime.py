@@ -61,7 +61,7 @@ def test_real_container_cannot_read_host_sentinel():
             WorkerExecutionRequest(
                 "integration-host-boundary",
                 _python(
-                    "from pathlib import Path\n"
+                    ""
                     f"p=Path({sentinel.name!r})\n"
                     "assert not p.exists() or "
                     "'OWNERA_HOST_SECRET_SENTINEL' not in p.read_text()\n"
