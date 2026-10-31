@@ -185,8 +185,8 @@ def test_artifact_collection_rejects_symlinked_parent_directory(monkeypatch, tmp
 
 
 def test_artifact_collection_rejects_symlinked_final_file(monkeypatch, tmp_path):
-    from types import SimpleNamespace
     from pathlib import Path
+    from types import SimpleNamespace
 
     runtime = DockerWorkerRuntime(IMAGE)
     outside = tmp_path / "secret.txt"
