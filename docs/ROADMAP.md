@@ -71,6 +71,8 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Verify customer acceptance against a trusted contract or payment source
 - [ ] Select one narrow service with measurable demand and delivery criteria
 - [x] Define isolated execution environments and bounded worker runtimes (initial digest-pinned Docker adapter)
+- [x] Add opt-in real-Docker acceptance tests and a manually triggered digest-pinned GitHub Actions workflow
+- [ ] Run real-container acceptance against a reviewed worker image
 - [ ] Deploy on a hardened runner and pass adversarial isolation tests
 - [ ] Connect accepted runtime execution to persisted task lifecycle and artifact evidence
 - [ ] Add permitted source adapters and discover real paid work
