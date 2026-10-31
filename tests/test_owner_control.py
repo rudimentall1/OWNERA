@@ -14,7 +14,7 @@ from ownera.owner_control import (
 )
 
 
-class TestAuthenticator:
+class StaticAuthenticator:
     def __init__(self, principals):
         self.principals = principals
 
@@ -45,7 +45,7 @@ def _public_key():
 
 def test_owner_can_enroll_and_actor_is_taken_from_verified_identity(tmp_path):
     registry = TrustedCustomerKeyRegistry(tmp_path / "keys.sqlite3")
-    auth = TestAuthenticator({"valid-token": _principal()})
+    auth = StaticAuthenticator({"valid-token": _principal()})
     control = OwnerKeyControl(registry, auth)
 
     control.enroll("valid-token", "customer-1", "key-1", _public_key())
@@ -68,7 +68,7 @@ def test_owner_can_enroll_and_actor_is_taken_from_verified_identity(tmp_path):
 )
 def test_non_admin_roles_cannot_change_trusted_keys(tmp_path, roles):
     registry = TrustedCustomerKeyRegistry(tmp_path / "keys.sqlite3")
-    auth = TestAuthenticator({"limited-token": _principal(roles=roles)})
+    auth = StaticAuthenticator({"limited-token": _principal(roles=roles)})
     control = OwnerKeyControl(registry, auth)
 
     with pytest.raises(OwnerControlError, match="permission required"):
@@ -80,7 +80,7 @@ def test_non_admin_roles_cannot_change_trusted_keys(tmp_path, roles):
 
 def test_invalid_credential_fails_closed_without_audit_event(tmp_path):
     registry = TrustedCustomerKeyRegistry(tmp_path / "keys.sqlite3")
-    control = OwnerKeyControl(registry, TestAuthenticator({}))
+    control = OwnerKeyControl(registry, StaticAuthenticator({}))
 
     with pytest.raises(OwnerControlError, match="authentication failed"):
         control.enroll("forged-token", "customer-1", "key-1", _public_key())
@@ -93,7 +93,7 @@ def test_expired_authenticated_principal_is_rejected(tmp_path):
     registry = TrustedCustomerKeyRegistry(tmp_path / "keys.sqlite3")
     expired = _principal(expires=datetime.now(timezone.utc) - timedelta(seconds=1))
     control = OwnerKeyControl(
-        registry, TestAuthenticator({"expired-token": expired})
+        registry, StaticAuthenticator({"expired-token": expired})
     )
 
     with pytest.raises(OwnerControlError, match="invalid or expired"):
@@ -106,7 +106,7 @@ def test_expired_authenticated_principal_is_rejected(tmp_path):
 def test_owner_rotation_and_revocation_are_audited(tmp_path):
     registry = TrustedCustomerKeyRegistry(tmp_path / "keys.sqlite3")
     control = OwnerKeyControl(
-        registry, TestAuthenticator({"valid-token": _principal()})
+        registry, StaticAuthenticator({"valid-token": _principal()})
     )
     control.enroll("valid-token", "customer-1", "key-1", _public_key())
     control.rotate(
@@ -135,7 +135,7 @@ def test_invalid_authenticator_result_is_rejected(tmp_path):
         session_id="",
     )
     control = OwnerKeyControl(
-        registry, TestAuthenticator({"bad": malformed})
+        registry, StaticAuthenticator({"bad": malformed})
     )
 
     with pytest.raises(OwnerControlError, match="invalid or expired"):
