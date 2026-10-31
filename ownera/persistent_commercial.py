@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ownera.commercial import (
     CommercialAssessment,
+    CommercialEvidenceGate,
     CommercialEngine,
     CommercialOpportunity,
     ProposalDraft,
@@ -20,10 +21,16 @@ from ownera.commercial_repository import SQLiteCommercialRepository
 class PersistentCommercialEngine:
     """Persists each successful commercial transition as a versioned snapshot."""
 
-    def __init__(self, database_path: str) -> None:
+    def __init__(
+        self,
+        database_path: str,
+        evidence_gate: CommercialEvidenceGate | None = None,
+    ) -> None:
         self.repository = SQLiteCommercialRepository(database_path)
+        self._evidence_gate = evidence_gate
         snapshot = self.repository.load()
         self._engine = snapshot.engine if snapshot else CommercialEngine()
+        self._engine.set_evidence_gate(self._evidence_gate)
         self._version = snapshot.version if snapshot else 0
         self.repository.event_store.verify("commercial_pipeline", "primary")
         self._event_version = len(
@@ -45,6 +52,7 @@ class PersistentCommercialEngine:
     def refresh(self) -> None:
         snapshot = self.repository.load()
         self._engine = snapshot.engine if snapshot else CommercialEngine()
+        self._engine.set_evidence_gate(self._evidence_gate)
         self._version = snapshot.version if snapshot else 0
         self._event_version = len(
             self.repository.event_store.load("commercial_pipeline", "primary")
