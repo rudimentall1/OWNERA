@@ -7,6 +7,7 @@ import pytest
 from ownera.settlement import (
     ReceiptConflict,
     ReceiptLimitExceeded,
+    SettlementIntegrityError,
     SQLiteSettlementLedger,
 )
 
@@ -128,6 +129,7 @@ def test_receipt_and_event_are_committed_atomically(tmp_path):
     finally:
         connection.close()
 
-    # The event chain remains intact, but the ledger's row/event consistency
-    # must be checked by a separate reconciliation layer in a later increment.
-    assert ledger.verify(order_id) is True
+    # The hash chain alone remains valid, but row/event reconciliation detects
+    # the changed financial amount.
+    with pytest.raises(SettlementIntegrityError, match="differs from event"):
+        ledger.verify(order_id)
