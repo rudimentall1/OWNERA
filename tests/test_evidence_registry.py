@@ -1,9 +1,15 @@
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
+from ownera.commercial import (
+    CommercialAssessment,
+    CommercialOpportunity,
+    OpportunityStatus,
+)
 from ownera.evidence_registry import (
     EvidenceIntegrityError,
     EvidenceRegistryError,
@@ -11,6 +17,7 @@ from ownera.evidence_registry import (
     SQLiteOpportunityEvidenceRegistry,
 )
 from ownera.owner_control import AuthenticatedPrincipal, OwnerControlError
+from ownera.persistent_commercial import PersistentCommercialEngine
 
 
 class StaticAuthenticator:
@@ -212,3 +219,47 @@ def test_verify_detects_review_identity_row_tampering(registry):
 
     with pytest.raises(EvidenceIntegrityError, match="review event"):
         registry.verify(item.evidence_id)
+
+
+def test_persistent_qualification_requires_accepted_registry_evidence(tmp_path):
+    database = tmp_path / "ownera.db"
+    registry = SQLiteOpportunityEvidenceRegistry(database, StaticAuthenticator())
+    opportunity_id = uuid4()
+    evidence = _capture(registry, opportunity_id)
+    opportunity = CommercialOpportunity(
+        opportunity_id=opportunity_id,
+        title="Paid API security review",
+        description="Review a bounded API authorization scope.",
+        source_name="Public bounty board",
+        source_url="https://example.com/bounty/42",
+        budget_min=Decimal("500"),
+        budget_max=Decimal("700"),
+        currency="EUR",
+        required_capabilities=frozenset({"python", "security"}),
+        evidence_refs=(str(evidence.evidence_id),),
+    )
+    assessment = CommercialAssessment(
+        opportunity_id=opportunity_id,
+        estimated_delivery_cost=Decimal("100"),
+        platform_fee_rate=Decimal("0.10"),
+        contingency_rate=Decimal("0.10"),
+        win_probability=Decimal("0.50"),
+        minimum_net_margin=Decimal("0.20"),
+        terms_reviewed=True,
+        eligibility_confirmed=True,
+    )
+    commercial = PersistentCommercialEngine(str(database), evidence_gate=registry)
+    commercial.add_opportunity(opportunity)
+
+    pending = commercial.assess(assessment)
+    assert pending.status is OpportunityStatus.NEEDS_REVIEW
+    assert "evidence_not_owner_accepted" in pending.reasons
+
+    registry.review("valid", evidence.evidence_id, accept=True)
+    accepted = commercial.assess(assessment)
+    assert accepted.status is OpportunityStatus.QUALIFIED
+    assert "evidence_not_owner_accepted" not in accepted.reasons
+
+    restarted = PersistentCommercialEngine(str(database), evidence_gate=registry)
+    restored_result = restarted.assess(assessment)
+    assert restored_result.status is OpportunityStatus.QUALIFIED
