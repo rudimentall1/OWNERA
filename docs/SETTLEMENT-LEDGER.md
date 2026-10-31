@@ -39,7 +39,7 @@ local, single-node SQLite ledger, not a distributed accounting system.
 
 ## Next acceptance boundary
 
-Add reconciliation that compares every receipt row with its corresponding
-event, then add one real payment rail adapter with signature verification and
-replay protection. Only provider-verified or independently confirmed on-chain
-receipts should qualify as verified settlement.
+Add one real payment rail adapter with signature verification and replay
+protection, and reconcile provider events against this ledger. Only
+provider-verified or independently confirmed on-chain receipts should qualify
+as verified settlement.
