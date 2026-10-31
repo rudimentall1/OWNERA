@@ -5,7 +5,14 @@ import re
 import tempfile
 
 import pytest
+from decimal import Decimal
 
+from ownera.artifact_registry import SQLiteArtifactRegistry
+from ownera.artifact_review import ArtifactReviewService
+from ownera.persistent_workforce import PersistentWorkforce
+from ownera.quality_gate import CriterionAssessment, QualityGateService
+from ownera.worker_execution import WorkerExecutionService
+from ownera.workforce import TaskStatus, WorkerProfile, WorkTask
 from ownera.worker_runtime import (
     DockerWorkerRuntime,
     RuntimeLimits,
@@ -179,3 +186,79 @@ def test_real_container_memory_limit_is_enforced():
     )
     assert result.status == "FAILED"
     assert result.exit_code == 137
+
+
+
+def test_real_docker_execution_to_registry_review_and_quality_acceptance(tmp_path):
+    runtime = _runtime()
+    database = tmp_path / "workforce.sqlite3"
+    workforce = PersistentWorkforce(database)
+    workforce.register_worker(
+        WorkerProfile("docker-builder", "backend", frozenset({"python"}))
+    )
+    workforce.register_worker(
+        WorkerProfile("independent-reviewer", "qa", frozenset({"quality.review"}))
+    )
+    task = WorkTask(
+        title="Produce requested output",
+        description="Read the input specification and create the requested artifact.",
+        required_capabilities=frozenset({"python"}),
+        budget_limit=Decimal("10"),
+        currency="EUR",
+        acceptance_criteria=("Artifact contains the requested output",),
+    )
+    workforce.add_task(task)
+    workforce.assign(task.task_id)
+    workforce.start(task.task_id, "docker-builder")
+
+    registry = SQLiteArtifactRegistry(tmp_path / "artifacts.sqlite3")
+    execution = WorkerExecutionService(
+        runtime=runtime, registry=registry, workforce=workforce
+    )
+    submission = execution.execute_and_submit(
+        WorkerExecutionRequest(
+            task_id=str(task.task_id),
+            command=(
+                "python",
+                "-I",
+                "-c",
+                "from pathlib import Path; "
+                "spec=Path('/inputs/spec.txt').read_text(); "
+                "Path('/workspace/result.txt').write_text('DELIVERED: '+spec)",
+            ),
+            input_files={"spec.txt": b"customer-approved-scope"},
+            artifact_paths=("result.txt",),
+        ),
+        worker_id="docker-builder",
+        summary="Created the requested output in an isolated container.",
+        actual_cost=Decimal("1"),
+    )
+
+    assert submission.runtime_status == "SUCCEEDED"
+    assert len(submission.artifact_records) == 1
+    artifact = submission.artifact_records[0]
+    assert registry.get(artifact.sha256) == b"DELIVERED: customer-approved-scope"
+
+    quality_gate = QualityGateService(
+        workforce,
+        ArtifactReviewService(registry=registry, workforce=workforce),
+    )
+    result = quality_gate.review(
+        task.task_id,
+        "independent-reviewer",
+        (
+            CriterionAssessment(
+                "Artifact contains the requested output",
+                True,
+                (artifact.sha256,),
+                "Inspected the original artifact bytes.",
+            ),
+        ),
+        overall_notes="The submitted artifact matches the approved scope.",
+    )
+
+    assert result.accepted is True
+    assert result.task_status is TaskStatus.ACCEPTED
+    restored = PersistentWorkforce(database)
+    assert restored.tasks[0].status is TaskStatus.ACCEPTED
+    assert QualityGateService.extract_report(restored.reviews[0])["criteria"][0]["passed"]
