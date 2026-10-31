@@ -25,6 +25,8 @@ markers = ["integration: requires a real Docker daemon and a digest-pinned worke
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 ignore = ["FURB157", "UP017"]
 
 [tool.setuptools.packages.find]
