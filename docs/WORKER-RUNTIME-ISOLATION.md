@@ -64,9 +64,8 @@ a trusted image reference in the form `repository/image:tag@sha256:<64 hex>`.
 The image must contain Python 3 and must be trusted by the operator. The workflow
 does not choose or silently update the image.
 
-The integration suite exercises real Docker behavior for network isolation,
-host-file separation, read-only inputs, artifact export, timeout, output limits,
-and symlink-artifact rejection. These tests are not part of the default unit
+The integration suite exercises real Docker behavior for network isolation, host-file separation, read-only inputs, artifact export,
+process and memory limits, timeout, output limits, and symlink-artifact rejection. These tests are not part of the default unit
 suite because they require a Docker daemon and an explicitly selected image.
 A successful workflow run is evidence for that exact image and runner
 configuration only; it is not a general proof against kernel or daemon escapes.
@@ -74,7 +73,7 @@ configuration only; it is not a general proof against kernel or daemon escapes.
 ## Next gates
 
 1. Run the real-container workflow with a reviewed, digest-pinned Python image.
-2. Add process and memory exhaustion tests plus forced runner/process-failure cleanup tests.
+2. Add forced runner/process-failure cleanup tests and verify container removal after host-side interruption.
 3. Verify the runner uses rootless Docker or an equivalent hardened runtime on a dedicated Linux host.
 4. Add image signature verification and vulnerability-policy enforcement.
 5. Connect execution to the task lifecycle only after runtime acceptance tests pass.
