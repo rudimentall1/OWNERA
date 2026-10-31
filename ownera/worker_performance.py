@@ -83,8 +83,11 @@ class WorkerPerformanceService:
             payload = event.payload
             if event.event_type == "TaskStarted":
                 worker_id = self._required_string(payload, "worker_id", event)
-                if worker_id in stats:
-                    stats[worker_id]["started"] += 1
+                if worker_id not in stats:
+                    raise WorkerPerformanceError(
+                        f"task start references unregistered worker: {worker_id}"
+                    )
+                stats[worker_id]["started"] += 1
             elif event.event_type == "TaskSubmitted":
                 task_id = self._required_string(payload, "task_id", event)
                 worker_id = self._required_string(payload, "worker_id", event)
@@ -111,6 +114,8 @@ class WorkerPerformanceService:
                 accepted = payload.get("accepted")
                 if not isinstance(accepted, bool):
                     raise WorkerPerformanceError("review event has invalid accepted flag")
+                if accepted != (event.event_type == "TaskReviewAccepted"):
+                    raise WorkerPerformanceError("review event type conflicts with accepted flag")
                 attempt = latest_submission.get(task_id)
                 if attempt is None:
                     raise WorkerPerformanceError(
