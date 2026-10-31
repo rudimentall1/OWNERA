@@ -24,5 +24,5 @@ The service returns an `ArtifactReviewPacket` with original bytes and metadata. 
 - [x] Bind artifact provenance to the task's assigned worker.
 - [x] Return original bytes only after registry digest verification.
 - [x] Keep evidence loading separate from the accept/reject decision.
-- [ ] Run tests and CI on this change.
+- [x] Run tests and CI on this change.
 - [ ] Run independent review against real Docker-produced artifacts.
