@@ -34,6 +34,7 @@ def test_real_container_has_no_network_access():
             "integration-network",
             _python(
                 "import socket\n"
+                "assert [name for _, name in socket.if_nameindex()] == ['lo']\n"
                 "s=socket.socket()\n"
                 "s.settimeout(2)\n"
                 "try:\n"
@@ -128,3 +129,53 @@ def test_real_container_symlink_artifact_is_rejected():
                 artifact_paths=("leak",),
             )
         )
+
+
+def test_real_container_process_limit_is_enforced():
+    runtime = _runtime(limits=RuntimeLimits(pids=64, wall_seconds=15))
+    result = runtime.execute(
+        WorkerExecutionRequest(
+            "integration-pids-limit",
+            _python(
+                "import subprocess,sys\n"
+                "children=[]\n"
+                "try:\n"
+                " for _ in range(128):\n"
+                "  try:\n"
+                "   children.append(subprocess.Popen([sys.executable,'-c','import time;time.sleep(20)']))\n"
+                "  except OSError:\n"
+                "   break\n"
+                " assert len(children) < 128\n"
+                " print('pids-limited', len(children))\n"
+                "finally:\n"
+                " for child in children:\n"
+                "  child.terminate()\n"
+                " for child in children:\n"
+                "  child.wait(timeout=3)"
+            ),
+        )
+    )
+    assert result.status == "SUCCEEDED"
+    assert "pids-limited" in result.stdout
+
+
+def test_real_container_memory_limit_is_enforced():
+    runtime = _runtime(
+        limits=RuntimeLimits(
+            memory_bytes=256 * 1024 * 1024,
+            tmp_bytes=16 * 1024 * 1024,
+            wall_seconds=15,
+        )
+    )
+    result = runtime.execute(
+        WorkerExecutionRequest(
+            "integration-memory-limit",
+            _python(
+                "chunks=[]\n"
+                "while True:\n"
+                " chunks.append(bytearray(8 * 1024 * 1024))"
+            ),
+        )
+    )
+    assert result.status == "FAILED"
+    assert result.exit_code == 137
