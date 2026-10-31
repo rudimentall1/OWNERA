@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import os
 import re
 import tempfile
 
 import pytest
-from decimal import Decimal
 
 from ownera.artifact_registry import SQLiteArtifactRegistry
 from ownera.artifact_review import ArtifactReviewService
