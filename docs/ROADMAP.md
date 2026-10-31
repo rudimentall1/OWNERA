@@ -79,6 +79,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Run artifact-registry and execution-bridge unit tests and confirm CI
 - [x] Add independent reviewer-side artifact loading, task/worker provenance checks, and SHA-256 verification
 - [x] Run reviewer-side artifact tests and confirm CI
+- [x] Add evidence-complete worker Quality Gate with criterion-by-criterion review and durable structured reports
+- [x] Run Quality Gate tests and CI
+- [ ] Validate the complete quality gate against real Docker-produced work artifacts
 - [ ] Run independent review against real Docker-produced artifacts
 - [x] Connect runtime outputs to the artifact registry and persist digest references in task submission evidence
 - [ ] Run the complete path against a real digest-pinned Docker image
