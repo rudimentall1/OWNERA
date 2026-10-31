@@ -149,14 +149,14 @@ class CommercialEngine:
 
     def __init__(self, evidence_gate: CommercialEvidenceGate | None = None) -> None:
         self._evidence_gate = evidence_gate
-        self._opportunities: dict[UUID, CommercialOpportunity] = {};
+        self._opportunities: dict[UUID, CommercialOpportunity] = {}
+        self._assessments: dict[UUID, CommercialAssessment] = {}
+        self._results: dict[UUID, QualificationResult] = {}
+        self._proposals: dict[UUID, ProposalDraft] = {}
 
     def set_evidence_gate(self, evidence_gate: CommercialEvidenceGate | None) -> None:
         """Attach the fail-closed evidence gate used for future assessments."""
         self._evidence_gate = evidence_gate
-        self._assessments: dict[UUID, CommercialAssessment] = {}
-        self._results: dict[UUID, QualificationResult] = {}
-        self._proposals: dict[UUID, ProposalDraft] = {}
 
     @property
     def opportunities(self) -> tuple[CommercialOpportunity, ...]:
