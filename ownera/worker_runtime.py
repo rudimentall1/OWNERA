@@ -329,27 +329,39 @@ class DockerWorkerRuntime:
     def _collect_artifacts(
         self, docker: str, container_name: str, paths: tuple[str, ...]
     ) -> dict[str, bytes]:
+        if not paths:
+            return {}
         artifacts: dict[str, bytes] = {}
         total = 0
         with tempfile.TemporaryDirectory(prefix="ownera-artifacts-") as output_dir:
             root = Path(output_dir)
+            copied = subprocess.run(
+                [docker, "cp", f"{container_name}:/workspace/.", str(root)],
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, timeout=30, check=False,
+            )
+            if copied.returncode != 0:
+                raise WorkerRuntimeError("could not collect worker workspace")
             for name in paths:
                 relative = _safe_relative_path(name)
-                destination = root.joinpath(*relative.parts)
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                copied = subprocess.run(
-                    [
-                        docker, "cp",
-                        f"{container_name}:/workspace/{relative.as_posix()}",
-                        str(destination),
-                    ],
-                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE, timeout=15, check=False,
-                )
-                if copied.returncode != 0:
-                    raise WorkerRuntimeError(f"requested artifact is missing: {name}")
-                metadata = destination.lstat()
-                if destination.is_symlink() or not destination.is_file():
+                destination = root
+                for index, part in enumerate(relative.parts):
+                    destination = destination / part
+                    try:
+                        metadata = destination.lstat()
+                    except FileNotFoundError as exc:
+                        raise WorkerRuntimeError(
+                            f"requested artifact is missing: {name}"
+                        ) from exc
+                    if destination.is_symlink():
+                        raise WorkerRuntimeError(
+                            f"artifact path contains a symbolic link: {name}"
+                        )
+                    if index < len(relative.parts) - 1 and not destination.is_dir():
+                        raise WorkerRuntimeError(
+                            f"artifact parent is not a directory: {name}"
+                        )
+                if not destination.is_file():
                     raise WorkerRuntimeError(f"artifact is not a regular file: {name}")
                 if metadata.st_size > self.limits.max_artifact_bytes:
                     raise WorkerRuntimeError(f"artifact exceeds size limit: {name}")
