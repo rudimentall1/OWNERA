@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import re
 import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -61,7 +60,7 @@ def test_real_container_cannot_read_host_sentinel():
             WorkerExecutionRequest(
                 "integration-host-boundary",
                 _python(
-                    ""
+                    "from pathlib import Path\n"
                     f"p=Path({sentinel.name!r})\n"
                     "assert not p.exists() or "
                     "'OWNERA_HOST_SECRET_SENTINEL' not in p.read_text()\n"
@@ -118,18 +117,14 @@ def test_real_container_output_limit_is_enforced():
 
 def test_real_container_symlink_artifact_is_rejected():
     runtime = _runtime()
-    result = runtime.execute(
-        WorkerExecutionRequest(
-            "integration-symlink-artifact",
-            _python(
-                "from pathlib import Path\n"
-                "Path('/workspace/leak').symlink_to('/etc/passwd')"
-            ),
-            artifact_paths=("leak",),
-        )
-    )
-    assert result.status == "SUCCEEDED"
     with pytest.raises(WorkerRuntimeError, match="regular file"):
-        runtime._collect_artifacts(
-            runtime._resolve_docker(), "missing-after-cleanup", ("leak",)
+        runtime.execute(
+            WorkerExecutionRequest(
+                "integration-symlink-artifact",
+                _python(
+                    "from pathlib import Path\n"
+                    "Path('/workspace/leak').symlink_to('/etc/passwd')"
+                ),
+                artifact_paths=("leak",),
+            )
         )
