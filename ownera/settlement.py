@@ -261,6 +261,8 @@ class SQLiteSettlementLedger:
 
     @staticmethod
     def _money(value: Decimal, name: str) -> Decimal:
+        if isinstance(value, (float, bool)):
+            raise ValueError(f"{name} must not use float or boolean values")
         try:
             amount = Decimal(value)
         except (InvalidOperation, TypeError, ValueError) as exc:
