@@ -51,5 +51,6 @@ local, single-node SQLite ledger, not a distributed accounting system.
 Add one real payment rail adapter with signature verification and replay
 protection, and reconcile provider events against this ledger. Only
 provider-verified or independently confirmed on-chain receipts should qualify
-as verified settlement. The accepted order amount and currency are loaded from the canonical persisted
-handoff evidence rather than trusted as caller-supplied values.
+as verified settlement. The accepted order amount and currency are loaded from
+canonical persisted handoff evidence rather than trusted as caller-supplied
+values.
