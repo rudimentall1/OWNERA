@@ -42,10 +42,11 @@ def _review_packet(tmp_path):
         task.task_id, "builder", summary="Output generated",
         artifact_refs=(f"sha256:{record.sha256}",), actual_cost=Decimal("5"),
     )
-    packet = ArtifactReviewService(
-        registry=registry, workforce=workforce
-    ).load_for_review(task.task_id, "reviewer")
-    return workforce, task, packet, record
+    service = QualityGateService(
+        workforce,
+        ArtifactReviewService(registry=registry, workforce=workforce),
+    )
+    return workforce, task, service, record
 
 
 def _assessments(digest):
@@ -60,11 +61,10 @@ def _assessments(digest):
 
 
 def test_complete_report_accepts_task_and_persists_structured_evidence(tmp_path):
-    workforce, task, packet, record = _review_packet(tmp_path)
-    service = QualityGateService(workforce)
+    workforce, task, service, record = _review_packet(tmp_path)
 
     result = service.review(
-        packet, _assessments(record.sha256), overall_notes="All criteria verified."
+        task.task_id, "reviewer", _assessments(record.sha256), overall_notes="All criteria verified."
     )
 
     assert result.accepted is True
@@ -79,7 +79,7 @@ def test_complete_report_accepts_task_and_persists_structured_evidence(tmp_path)
 
 
 def test_failed_criterion_returns_task_for_rework_with_actionable_notes(tmp_path):
-    workforce, _task, packet, record = _review_packet(tmp_path)
+    workforce, task, service, record = _review_packet(tmp_path)
     assessments = (
         CriterionAssessment("Output is valid", True, (record.sha256,)),
         CriterionAssessment(
@@ -88,8 +88,8 @@ def test_failed_criterion_returns_task_for_rework_with_actionable_notes(tmp_path
         ),
     )
 
-    result = QualityGateService(workforce).review(
-        packet, assessments, overall_notes="One criterion failed."
+    result = service.review(
+        task.task_id, "reviewer", assessments, overall_notes="One criterion failed."
     )
 
     assert result.accepted is False
@@ -100,11 +100,11 @@ def test_failed_criterion_returns_task_for_rework_with_actionable_notes(tmp_path
 
 
 def test_incomplete_report_cannot_transition_task(tmp_path):
-    workforce, _task, packet, record = _review_packet(tmp_path)
+    workforce, task, service, record = _review_packet(tmp_path)
 
     with pytest.raises(QualityGateError, match="cover every acceptance criterion"):
-        QualityGateService(workforce).review(
-            packet,
+        service.review(
+            task.task_id, "reviewer",
             (CriterionAssessment("Output is valid", True, (record.sha256,)),),
             overall_notes="Incomplete.",
         )
@@ -114,54 +114,54 @@ def test_incomplete_report_cannot_transition_task(tmp_path):
 
 
 def test_duplicate_criterion_is_rejected(tmp_path):
-    workforce, _task, packet, record = _review_packet(tmp_path)
+    workforce, task, service, record = _review_packet(tmp_path)
     duplicate = (
         CriterionAssessment("Output is valid", True, (record.sha256,)),
         CriterionAssessment("Output is valid", True, (record.sha256,)),
     )
 
     with pytest.raises(QualityGateError, match="exactly once"):
-        QualityGateService(workforce).review(
-            packet, duplicate, overall_notes="Duplicate."
+        service.review(
+            task.task_id, "reviewer", duplicate, overall_notes="Duplicate."
         )
 
 
 def test_unverified_evidence_reference_is_rejected(tmp_path):
-    workforce, _task, packet, record = _review_packet(tmp_path)
+    workforce, task, service, record = _review_packet(tmp_path)
     invalid = (
         CriterionAssessment("Output is valid", True, ("0" * 64,)),
         CriterionAssessment("Output is documented", True, (record.sha256,)),
     )
 
     with pytest.raises(QualityGateError, match="outside the verified packet"):
-        QualityGateService(workforce).review(
-            packet, invalid, overall_notes="Bad evidence reference."
+        service.review(
+            task.task_id, "reviewer", invalid, overall_notes="Bad evidence reference."
         )
 
 
 def test_failed_criterion_requires_actionable_notes(tmp_path):
-    workforce, _task, packet, record = _review_packet(tmp_path)
+    workforce, task, service, record = _review_packet(tmp_path)
     invalid = (
         CriterionAssessment("Output is valid", True, (record.sha256,)),
         CriterionAssessment("Output is documented", False, (record.sha256,)),
     )
 
     with pytest.raises(QualityGateError, match="actionable notes"):
-        QualityGateService(workforce).review(
-            packet, invalid, overall_notes="Needs work."
+        service.review(
+            task.task_id, "reviewer", invalid, overall_notes="Needs work."
         )
 
 
 def test_report_requires_notes_and_rejects_naive_timestamp(tmp_path):
-    workforce, _task, packet, record = _review_packet(tmp_path)
+    workforce, task, service, record = _review_packet(tmp_path)
     with pytest.raises(QualityGateError, match="overall review notes"):
-        QualityGateService(workforce).review(
-            packet, _assessments(record.sha256), overall_notes=" "
+        service.review(
+            task.task_id, "reviewer", _assessments(record.sha256), overall_notes=" "
         )
 
     from datetime import datetime
     with pytest.raises(QualityGateError, match="timezone-aware"):
-        QualityGateService(workforce).review(
-            packet, _assessments(record.sha256), overall_notes="reviewed",
+        service.review(
+            task.task_id, "reviewer", _assessments(record.sha256), overall_notes="reviewed",
             now=datetime(2026, 10, 31, 12, 0, 0),
         )
