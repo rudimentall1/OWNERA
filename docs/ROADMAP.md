@@ -81,6 +81,10 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Run reviewer-side artifact tests and confirm CI
 - [x] Add evidence-complete worker Quality Gate with criterion-by-criterion review and durable structured reports
 - [x] Run Quality Gate tests and CI
+- [x] Add event-derived worker performance metrics from verified workforce history
+- [x] Attribute repeated submissions to the worker on each submission event, including rework cycles
+- [x] Reject stale workforce snapshots that diverge from event history
+- [x] Scope lifecycle idempotency keys to aggregate transition versions
 - [ ] Validate the complete quality gate against real Docker-produced work artifacts
 - [ ] Run independent review against real Docker-produced artifacts
 - [x] Connect runtime outputs to the artifact registry and persist digest references in task submission evidence
