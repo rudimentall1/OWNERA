@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID
 
-from ownera.artifact_review import ArtifactReviewPacket
+from ownera.artifact_review import ArtifactReviewService
 from ownera.persistent_workforce import PersistentWorkforce
 from ownera.workforce import TaskReview, TaskStatus
 
@@ -51,12 +51,14 @@ class QualityGateService:
 
     REPORT_PREFIX = "quality_gate_report:v1:"
 
-    def __init__(self, workforce: PersistentWorkforce) -> None:
+    def __init__(self, workforce: PersistentWorkforce, artifact_review: ArtifactReviewService) -> None:
         self.workforce = workforce
+        self.artifact_review = artifact_review
 
     def review(
         self,
-        packet: ArtifactReviewPacket,
+        task_id: UUID,
+        reviewer_id: str,
         assessments: tuple[CriterionAssessment, ...],
         *,
         overall_notes: str,
@@ -65,12 +67,13 @@ class QualityGateService:
         if not overall_notes.strip():
             raise QualityGateError("overall review notes are required")
 
+        packet = self.artifact_review.load_for_review(task_id, reviewer_id)
         task = next(
-            (item for item in self.workforce.tasks if item.task_id == packet.task_id),
+            (item for item in self.workforce.tasks if item.task_id == task_id),
             None,
         )
         if task is None:
-            raise QualityGateError("review packet references an unknown task")
+            raise QualityGateError("review references an unknown task")
         if task.status is not TaskStatus.READY_FOR_REVIEW:
             raise QualityGateError("task is no longer ready for review")
         if task.assigned_worker_id != packet.worker_id:
@@ -152,8 +155,8 @@ class QualityGateService:
             f"OVERALL: {report.overall_notes}",
         )
         updated = self.workforce.review(
-            packet.task_id,
-            packet.reviewer_id,
+            task_id,
+            reviewer_id,
             accepted=accepted,
             findings=findings,
             now=reviewed_at,
