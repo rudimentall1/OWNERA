@@ -182,10 +182,11 @@ def test_non_owner_cannot_record_receipts(tmp_path, roles):
         ledger, TestAuthenticator({"limited": _principal(roles=roles)})
     )
 
+    order_id = uuid4()
     with pytest.raises(OwnerControlError, match="permission required"):
         control.record_receipt(
             "limited",
-            order_id=uuid4(),
+            order_id=order_id,
             accepted_amount=Decimal("100"),
             amount=Decimal("50"),
             currency="EUR",
@@ -194,7 +195,7 @@ def test_non_owner_cannot_record_receipts(tmp_path, roles):
             idempotency_key="limited-1",
         )
 
-    assert ledger.list_for_order(uuid4()) == ()
+    assert ledger.list_for_order(order_id) == ()
 
 
 def test_invalid_and_expired_credentials_cannot_record_receipts(tmp_path):
