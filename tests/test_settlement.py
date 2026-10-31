@@ -345,3 +345,21 @@ def test_receipt_fails_when_canonical_order_evidence_is_missing(tmp_path):
             evidence_sha256="d" * 64,
             idempotency_key="missing-order-1",
         )
+
+
+
+@pytest.mark.parametrize("amount", [1.1, True])
+def test_settlement_rejects_float_and_boolean_amounts(tmp_path, amount):
+    ledger = SQLiteSettlementLedger(tmp_path / "ownera.sqlite3")
+
+    with pytest.raises(ValueError, match="float or boolean"):
+        ledger._record_receipt(
+            order_id=uuid4(),
+            accepted_amount=Decimal("100"),
+            amount=amount,
+            currency="EUR",
+            payment_reference="internal-test",
+            evidence_sha256="e" * 64,
+            recorded_by="owner-test",
+            idempotency_key="invalid-numeric",
+        )
