@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from urllib.parse import urlparse
+from typing import Protocol
 from uuid import UUID, uuid4
 
 
@@ -134,11 +135,25 @@ class ProposalDraft:
             raise ValueError("currency must be a three-letter code")
 
 
+class CommercialEvidenceGate(Protocol):
+    """Validates that an opportunity's evidence was accepted by its owner."""
+
+    def require_accepted(
+        self, opportunity_id: UUID, evidence_refs: tuple[str, ...]
+    ) -> None:
+        ...
+
+
 class CommercialEngine:
     """In-memory opportunity pipeline with conservative economics and approval gates."""
 
-    def __init__(self) -> None:
-        self._opportunities: dict[UUID, CommercialOpportunity] = {}
+    def __init__(self, evidence_gate: CommercialEvidenceGate | None = None) -> None:
+        self._evidence_gate = evidence_gate
+        self._opportunities: dict[UUID, CommercialOpportunity] = {};
+
+    def set_evidence_gate(self, evidence_gate: CommercialEvidenceGate | None) -> None:
+        """Attach the fail-closed evidence gate used for future assessments."""
+        self._evidence_gate = evidence_gate
         self._assessments: dict[UUID, CommercialAssessment] = {}
         self._results: dict[UUID, QualificationResult] = {}
         self._proposals: dict[UUID, ProposalDraft] = {}
@@ -175,6 +190,14 @@ class CommercialEngine:
         net_margin = net_profit / revenue if revenue > 0 else Decimal("-1")
         risk_adjusted = net_profit * assessment.win_probability
         reasons: list[str] = []
+
+        if self._evidence_gate is not None:
+            try:
+                self._evidence_gate.require_accepted(
+                    opportunity.opportunity_id, opportunity.evidence_refs
+                )
+            except Exception:
+                reasons.append("evidence_not_owner_accepted")
 
         if opportunity.deadline is not None and opportunity.deadline <= current_time:
             reasons.append("deadline_expired")
