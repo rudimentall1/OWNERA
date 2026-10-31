@@ -3,10 +3,18 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Protocol
 from uuid import UUID
 
 from .owner_control import AuthenticatedPrincipal, CredentialAuthenticator, OwnerControlError
 from .settlement import ReceiptRecord, SQLiteSettlementLedger
+
+
+class AcceptedOrderEvidenceSource(Protocol):
+    """Trusted source that verifies persisted order-acceptance evidence."""
+
+    def load_order_acceptance_evidence(self, order_id: UUID) -> dict:
+        ...
 
 
 class OwnerSettlementControl:
@@ -17,9 +25,11 @@ class OwnerSettlementControl:
     def __init__(
         self,
         ledger: SQLiteSettlementLedger,
+        order_evidence: AcceptedOrderEvidenceSource,
         authenticator: CredentialAuthenticator,
     ) -> None:
         self._ledger = ledger
+        self._order_evidence = order_evidence
         self._authenticator = authenticator
 
     def _owner(self, credential: str) -> AuthenticatedPrincipal:
@@ -53,15 +63,21 @@ class OwnerSettlementControl:
         credential: str,
         *,
         order_id: UUID,
-        accepted_amount: Decimal,
         amount: Decimal,
-        currency: str,
         payment_reference: str,
         evidence_sha256: str,
         idempotency_key: str,
         recorded_at: datetime | None = None,
     ) -> ReceiptRecord:
         owner = self._owner(credential)
+        try:
+            evidence = self._order_evidence.load_order_acceptance_evidence(order_id)
+            if evidence.get("order_id") != str(order_id):
+                raise ValueError("order evidence does not match requested order")
+            accepted_amount = Decimal(evidence["accepted_amount"])
+            currency = str(evidence["currency"]).upper()
+        except Exception as exc:
+            raise OwnerControlError("canonical accepted-order evidence is unavailable or invalid") from exc
         return self._ledger._record_receipt(
             order_id=order_id,
             accepted_amount=accepted_amount,
