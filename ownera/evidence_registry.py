@@ -372,8 +372,7 @@ class SQLiteOpportunityEvidenceRegistry:
                 raise EvidenceRegistryError("evidence belongs to a different opportunity")
             if item.status is not EvidenceStatus.ACCEPTED:
                 raise EvidenceRegistryError("evidence has not been accepted by the owner")
-            if self._content_digest(item.content_snapshot) != item.content_sha256:
-                raise EvidenceIntegrityError("evidence content digest mismatch")
+            self.verify(evidence_id)
 
     def verify(self, evidence_id: UUID) -> bool:
         item = self.get(evidence_id)
@@ -412,7 +411,33 @@ class SQLiteOpportunityEvidenceRegistry:
             if actual != row["event_hash"]:
                 raise EvidenceIntegrityError("evidence audit event hash mismatch")
             previous_hash = actual
-        latest = json.loads(rows[-1]["payload_json"])
-        if latest.get("status", EvidenceStatus.PENDING.value) != item.status.value:
-            raise EvidenceIntegrityError("evidence row and audit status disagree")
+        capture = json.loads(rows[0]["payload_json"])
+        if (
+            rows[0]["event_type"] != "EvidenceCaptured"
+            or capture.get("opportunity_id") != str(item.opportunity_id)
+            or capture.get("source_name") != item.source_name
+            or capture.get("source_url") != item.source_url
+            or capture.get("captured_at") != item.captured_at.isoformat()
+            or capture.get("content_sha256") != item.content_sha256
+        ):
+            raise EvidenceIntegrityError("evidence row does not match capture event")
+        if len(rows) not in (1, 2):
+            raise EvidenceIntegrityError("evidence audit contains an invalid event sequence")
+        if len(rows) == 1:
+            if item.status is not EvidenceStatus.PENDING or item.reviewed_by is not None:
+                raise EvidenceIntegrityError("evidence row has review fields without a review event")
+        else:
+            review = json.loads(rows[1]["payload_json"])
+            if (
+                rows[1]["event_type"] != "EvidenceReviewed"
+                or review.get("status") != item.status.value
+                or review.get("reviewed_by") != item.reviewed_by
+                or review.get("reviewed_at") != (
+                    item.reviewed_at.isoformat() if item.reviewed_at else None
+                )
+                or review.get("review_note") != (item.review_note or "")
+                or review.get("content_sha256") != item.content_sha256
+                or item.status is EvidenceStatus.PENDING
+            ):
+                raise EvidenceIntegrityError("evidence row does not match review event")
         return True
