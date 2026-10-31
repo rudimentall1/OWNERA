@@ -23,7 +23,7 @@ The default maximum artifact size is 16 MiB and can be lowered or raised by the 
 
 The digest proves byte identity, not authorship, correctness, malware-freedom, or customer acceptance. Worker identity is metadata supplied by the trusted caller; the registry does not authenticate workers. The registry does not yet enforce task ownership or accepted-task lifecycle state.
 
-No HTTP endpoint, object-store replication, retention/deletion policy, malware scanning, encryption-at-rest policy, or independent reviewer workflow is implemented here. The registry is not yet connected to Docker artifact extraction or PersistentWorkforce.
+No HTTP endpoint, object-store replication, retention/deletion policy, malware scanning, encryption-at-rest policy, or independent reviewer workflow is implemented here. The registry is connected to PersistentWorkforce through the initial `WorkerExecutionService` bridge, but it is not a distributed transaction and real Docker acceptance remains pending.
 
 ## Acceptance criteria
 
@@ -34,6 +34,7 @@ No HTTP endpoint, object-store replication, retention/deletion policy, malware s
 - [x] Path-like artifact names and unsafe identifiers are rejected.
 - [x] Per-artifact size limit is enforced.
 - [ ] Run unit tests and CI on the repository commit.
-- [ ] Integrate verified runtime outputs into the registry.
-- [ ] Bind artifact digests into task submission and independent review evidence.
+- [x] Integrate runtime outputs into the registry through the initial submission bridge.
+- [x] Bind artifact digests into the persisted TaskSubmitted event through the submission bridge.
+- [ ] Add independent reviewer-side artifact loading and digest verification.
 - [ ] Define retention, backup, encryption-at-rest, and disk quota operations.
