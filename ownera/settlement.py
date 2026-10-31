@@ -5,7 +5,6 @@ verify bank transfers, payment-provider events, invoices, or on-chain transfers.
 """
 from __future__ import annotations
 
-import hashlib
 import re
 import sqlite3
 from dataclasses import dataclass
@@ -262,7 +261,7 @@ class SQLiteSettlementLedger:
     @staticmethod
     def _money(value: Decimal, name: str) -> Decimal:
         if isinstance(value, (float, bool)):
-            raise ValueError(f"{name} must not use float or boolean values")
+            raise TypeError(f"{name} must not use float or boolean values")
         try:
             amount = Decimal(value)
         except (InvalidOperation, TypeError, ValueError) as exc:
