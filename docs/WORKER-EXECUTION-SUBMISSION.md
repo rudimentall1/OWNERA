@@ -28,6 +28,6 @@
 - [x] Refuse unsuccessful runtime results and mismatched task IDs.
 - [x] Register output bytes before submitting digest references.
 - [x] Persist digest references through the existing TaskSubmitted event.
-- [ ] Run unit tests and CI.
+- [x] Run unit tests and CI.
 - [ ] Run the complete path against a real digest-pinned Docker image.
 - [ ] Add independent reviewer-side artifact loading and digest verification.
