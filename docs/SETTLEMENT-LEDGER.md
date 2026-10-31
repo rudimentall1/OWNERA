@@ -21,14 +21,18 @@ transaction.
 - Partial receipts are supported. Cumulative owner-attested receipts cannot
   exceed the accepted order amount.
 - Receipt row and hash-chained event are committed atomically.
+- The application-facing `OwnerSettlementControl` requires a verified principal
+  with `owner:settlement`; the audit actor is derived from that principal.
+- The raw ledger write method is internal and must not be exposed by an API.
 
 ## What this does not prove
 
 An owner-attested record is not independent proof that money reached a bank
 account, wallet, or payment processor. The digest proves neither authenticity
-nor truth of the underlying evidence. There is no payment-provider webhook,
-bank connector, on-chain transaction verifier, invoice lifecycle, refund or
-chargeback model, or automatic reconciliation yet. Do not report these records
+nor truth of the underlying evidence. There is no production identity provider or HTTP boundary, payment-provider
+webhook, bank connector, on-chain transaction verifier, invoice lifecycle,
+refund or chargeback model, or automatic reconciliation yet. The injected
+authenticator is a contract; the current test authenticator is test-only. Do not report these records
 as independently verified revenue.
 
 The event chain is tamper-evident, not tamper-proof. The ledger verification
@@ -42,4 +46,5 @@ local, single-node SQLite ledger, not a distributed accounting system.
 Add one real payment rail adapter with signature verification and replay
 protection, and reconcile provider events against this ledger. Only
 provider-verified or independently confirmed on-chain receipts should qualify
-as verified settlement.
+as verified settlement. The accepted order amount must also be loaded from the
+canonical accepted-order record rather than trusted as a caller-supplied value.
