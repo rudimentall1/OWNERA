@@ -92,7 +92,7 @@ def test_tampered_artifact_is_rejected_for_review(tmp_path):
 
 
 def test_missing_task_provenance_is_rejected(tmp_path):
-    workforce, task, registry, record = _submitted_task(tmp_path)
+    workforce, task, registry, _ = _submitted_task(tmp_path)
     connection = sqlite3.connect(registry.database_path)
     connection.execute(
         "DELETE FROM worker_artifact_records WHERE task_id = ?",
