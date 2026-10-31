@@ -92,7 +92,7 @@ class SQLiteSettlementLedger:
         connection.execute("PRAGMA synchronous = FULL")
         return connection
 
-    def record_receipt(
+    def _record_receipt(
         self,
         *,
         order_id: UUID,
