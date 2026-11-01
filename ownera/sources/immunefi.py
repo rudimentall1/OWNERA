@@ -5,6 +5,7 @@ adapter validates the observed schema, fails closed on structural drift, and
 never submits reports or authorizes testing.
 """
 
+# ruff: noqa: I001
 from __future__ import annotations
 
 import json
