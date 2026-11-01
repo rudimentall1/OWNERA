@@ -10,7 +10,6 @@ from ownera.evidence_registry import (
     SQLiteOpportunityEvidenceRegistry,
 )
 from ownera.owner_control import AuthenticatedPrincipal
-
 from ownera.sources.immunefi import (
     IMMUNEFI_CATALOG_URL,
     ImmunefiPublicCatalogAdapter,
