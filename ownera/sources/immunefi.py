@@ -26,7 +26,7 @@ class SourceAdapterError(RuntimeError):
 
 @dataclass(frozen=True)
 class DiscoveredBounty:
-    """Unqualified public listing. max_bounty_usd is a ceiling, never guaranteed revenue."""
+    """Unqualified public listing. max_bounty_ceiling is a ceiling, never guaranteed revenue."""
 
     opportunity_id: UUID
     evidence_id: UUID
