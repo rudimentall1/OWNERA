@@ -280,7 +280,7 @@ class SQLiteOpportunityEvidenceRegistry:
         now: datetime | None = None,
     ) -> OpportunityEvidence:
         if not isinstance(accept, bool):
-            raise ValueError("accept must be a boolean")
+            raise TypeError("accept must be a boolean")
         if len(note) > 2_000:
             raise ValueError("review note exceeds the maximum allowed size")
         owner = self._owner(credential)
