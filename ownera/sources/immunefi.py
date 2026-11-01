@@ -7,11 +7,11 @@ never submits reports or authorizes testing.
 
 from __future__ import annotations
 
-import json
-import typing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
+import json
+import typing
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
