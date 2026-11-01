@@ -5,6 +5,12 @@ from uuid import uuid4
 
 import pytest
 
+from ownera.evidence_registry import (
+    EvidenceStatus,
+    SQLiteOpportunityEvidenceRegistry,
+)
+from ownera.owner_control import AuthenticatedPrincipal
+
 from ownera.sources.immunefi import (
     IMMUNEFI_CATALOG_URL,
     ImmunefiPublicCatalogAdapter,
@@ -135,3 +141,36 @@ def test_ingest_does_not_capture_when_record_identity_is_invalid():
         )
 
     assert registry.records == []
+
+
+class OwnerAuthenticator:
+    def authenticate(self, credential):
+        if credential != "owner-token":
+            raise ValueError("invalid credential")
+        now = datetime.now(timezone.utc)
+        return AuthenticatedPrincipal(
+            issuer="test-issuer",
+            subject="owner-1",
+            roles=frozenset({"owner:commercial"}),
+            authenticated_at=now,
+            expires_at=now.replace(year=now.year + 1),
+            authentication_method="test",
+            session_id="source-adapter-test",
+        )
+
+
+def test_live_adapter_ingestion_writes_pending_evidence_to_real_registry(tmp_path):
+    registry = SQLiteOpportunityEvidenceRegistry(
+        tmp_path / "evidence.db", OwnerAuthenticator()
+    )
+    adapter = ImmunefiPublicCatalogAdapter(registry)
+    candidates = adapter.ingest(
+        json.dumps([_record()]).encode(),
+        now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+    )
+
+    assert len(candidates) == 1
+    evidence = registry.get(candidates[0].evidence_id)
+    assert evidence.opportunity_id == candidates[0].opportunity_id
+    assert evidence.status is EvidenceStatus.PENDING
+    assert registry.verify(evidence.evidence_id)
