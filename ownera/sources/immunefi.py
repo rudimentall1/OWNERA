@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Protocol
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 from uuid import UUID, uuid4
 
@@ -81,6 +81,16 @@ class ImmunefiPublicCatalogAdapter:
         )
         try:
             with urlopen(request, timeout=self.TIMEOUT_SECONDS) as response:
+                final_url = urlparse(response.geturl())
+                if (
+                    final_url.scheme != "https"
+                    or final_url.hostname is None
+                    or not (
+                        final_url.hostname == "immunefi.com"
+                        or final_url.hostname.endswith(".immunefi.com")
+                    )
+                ):
+                    raise SourceAdapterError("Immunefi catalog redirected outside its domain")
                 content_type = response.headers.get("Content-Type", "").lower()
                 if "application/json" not in content_type:
                     raise SourceAdapterError("Immunefi catalog did not return JSON")
