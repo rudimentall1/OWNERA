@@ -7,10 +7,7 @@ directories, credentials, or writable host paths into the container.
 
 from __future__ import annotations
 
-import os
-import selectors
 import shutil
-import signal
 import subprocess
 import tempfile
 import time
@@ -177,7 +174,21 @@ class DockerWorkerRuntime:
         container_name = f"ownera-worker-{uuid4().hex}"
         with tempfile.TemporaryDirectory(prefix="ownera-input-") as input_dir:
             input_root = Path(input_dir)
+            if ".ownera-worker-wrapper.sh" in request.input_files:
+                raise WorkerRuntimeError("input path is reserved for the worker wrapper")
             self._stage_inputs(input_root, request.input_files)
+            wrapper = input_root / ".ownera-worker-wrapper.sh"
+            wrapper.write_text(
+                "#!/bin/sh\n"
+                "set +e\n"
+                "\"$@\" > /workspace/.ownera_stdout 2> /workspace/.ownera_stderr\n"
+                "result=$?\n"
+                "printf \"%s\" \"$result\" > /workspace/.ownera_exit\n"
+                "sleep 600\n"
+                "exit \"$result\"\n",
+                encoding="utf-8",
+            )
+            wrapper.chmod(0o444)
             args = self._container_args(docker, container_name, input_root, request.command)
             status = "FAILED"
             exit_code = None
@@ -228,7 +239,7 @@ class DockerWorkerRuntime:
     ) -> list[str]:
         limits = self.limits
         return [
-            docker, "run", "--pull=never", "--name", name,
+            docker, "run", "-d", "--pull=never", "--name", name,
             "--network", "none",
             "--read-only",
             "--cap-drop", "ALL",
@@ -242,79 +253,77 @@ class DockerWorkerRuntime:
             "--user", "65532:65532",
             "--workdir", "/workspace",
             "--mount", f"type=bind,src={input_root},dst=/inputs,readonly",
-            "--tmpfs", f"/workspace:rw,nosuid,nodev,size={limits.max_workspace_bytes}",
-            "--tmpfs", f"/tmp:rw,noexec,nosuid,nodev,size={limits.tmp_bytes}",
+            "--tmpfs", f"/workspace:rw,nosuid,nodev,size={limits.max_workspace_bytes},uid=65532,gid=65532,mode=1770",
+            "--tmpfs", f"/tmp:rw,noexec,nosuid,nodev,size={limits.tmp_bytes},uid=65532,gid=65532,mode=1777",
             "--env", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "--log-driver", "none",
-            self.image, *command,
+            self.image, "sh", "/inputs/.ownera-worker-wrapper.sh", *command,
         ]
 
     def _run_container(
         self, args: list[str], container_name: str, timeout: int
     ) -> tuple[str, int | None, bytes, bytes]:
-        process = subprocess.Popen(
-            args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, start_new_session=True, close_fds=True,
+        docker = args[0]
+        launched = subprocess.run(
+            args, stdin=subprocess.DEVNULL, capture_output=True,
+            timeout=30, check=False,
         )
-        assert process.stdout is not None and process.stderr is not None
-        selector = selectors.DefaultSelector()
-        buffers = {"stdout": bytearray(), "stderr": bytearray()}
-        selector.register(process.stdout, selectors.EVENT_READ, "stdout")
-        selector.register(process.stderr, selectors.EVENT_READ, "stderr")
-        deadline = time.monotonic() + timeout
-        status = "SUCCEEDED"
-        try:
-            while selector.get_map() or process.poll() is None:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    status = "TIMED_OUT"
-                    self._kill_process_group(process)
-                    self._stop_container(self._resolve_docker(), container_name)
-                    break
-                for key, _ in selector.select(min(remaining, 0.1)):
-                    chunk = os.read(key.fileobj.fileno(), 65536)
-                    if not chunk:
-                        selector.unregister(key.fileobj)
-                        key.fileobj.close()
-                        continue
-                    total = len(buffers["stdout"]) + len(buffers["stderr"])
-                    available = max(0, self.limits.max_output_bytes - total)
-                    buffers[key.data].extend(chunk[:available])
-                    if len(chunk) > available:
-                        status = "OUTPUT_LIMIT_EXCEEDED"
-                        self._kill_process_group(process)
-                        self._stop_container(self._resolve_docker(), container_name)
-                        break
-                if status != "SUCCEEDED":
-                    break
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                self._kill_process_group(process)
-                process.wait(timeout=2)
-        except BaseException:
-            self._kill_process_group(process)
-            self._stop_container(self._resolve_docker(), container_name)
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                self._kill_process_group(process)
-            raise
-        finally:
-            selector.close()
-            for stream in (process.stdout, process.stderr):
-                if not stream.closed:
-                    stream.close()
-        if status == "SUCCEEDED" and process.returncode != 0:
-            status = "FAILED"
-        return status, process.returncode, bytes(buffers["stdout"]), bytes(buffers["stderr"])
+        if launched.returncode != 0:
+            return "FAILED", launched.returncode, launched.stdout, launched.stderr
 
-    @staticmethod
-    def _kill_process_group(process: subprocess.Popen) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            marker = subprocess.run(
+                [docker, "exec", container_name, "sh", "-c",
+                 "test -f /workspace/.ownera_exit"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, timeout=5, check=False,
+            )
+            if marker.returncode == 0:
+                break
+            state = subprocess.run(
+                [docker, "inspect", "--format", "{{.State.Running}}", container_name],
+                stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=False,
+            )
+            if state.returncode != 0 or state.stdout.strip() != b"true":
+                exit_result = subprocess.run(
+                    [docker, "inspect", "--format", "{{.State.ExitCode}}", container_name],
+                    stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=False,
+                )
+                try:
+                    exit_code = int(exit_result.stdout.strip())
+                except ValueError:
+                    exit_code = None
+                return (
+                    "FAILED", exit_code, b"",
+                    b"worker container exited before writing its completion marker; image must provide /bin/sh and sleep",
+                )
+            time.sleep(0.1)
+        else:
+            self._stop_container(docker, container_name)
+            return "TIMED_OUT", None, b"", b"worker execution exceeded its wall-time limit"
+
+        def read_container_file(path: str) -> bytes:
+            result = subprocess.run(
+                [docker, "exec", container_name, "cat", path],
+                stdin=subprocess.DEVNULL, capture_output=True, timeout=10, check=False,
+            )
+            if result.returncode != 0:
+                raise WorkerRuntimeError(f"could not read worker output: {path}")
+            return result.stdout
+
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+            exit_code = int(read_container_file("/workspace/.ownera_exit").strip())
+        except ValueError as exc:
+            raise WorkerRuntimeError("worker completion marker is invalid") from exc
+        stdout = read_container_file("/workspace/.ownera_stdout")
+        stderr = read_container_file("/workspace/.ownera_stderr")
+        if len(stdout) + len(stderr) > self.limits.max_output_bytes:
+            return (
+                "OUTPUT_LIMIT_EXCEEDED", exit_code,
+                stdout[:self.limits.max_output_bytes], b"worker output exceeded configured limit",
+            )
+        return ("SUCCEEDED" if exit_code == 0 else "FAILED", exit_code, stdout, stderr)
 
     @staticmethod
     def _stop_container(docker: str, name: str) -> None:
@@ -330,47 +339,62 @@ class DockerWorkerRuntime:
     def _collect_artifacts(
         self, docker: str, container_name: str, paths: tuple[str, ...]
     ) -> dict[str, bytes]:
-        if not paths:
-            return {}
         artifacts: dict[str, bytes] = {}
         total = 0
-        with tempfile.TemporaryDirectory(prefix="ownera-artifacts-") as output_dir:
-            root = Path(output_dir)
-            copied = subprocess.run(
-                [docker, "cp", f"{container_name}:/workspace/.", str(root)],
-                stdin=subprocess.DEVNULL, capture_output=True,
-                timeout=30, check=False,
+
+        def check(path: str, predicate: str) -> bool:
+            result = subprocess.run(
+                [docker, "exec", container_name, "sh", "-c",
+                 f"test {predicate} \"$1\"", "sh", path],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, timeout=10, check=False,
             )
-            if copied.returncode != 0:
-                raise WorkerRuntimeError("could not collect worker workspace")
-            for name in paths:
-                relative = _safe_relative_path(name)
-                destination = root
-                for index, part in enumerate(relative.parts):
-                    destination = destination / part
-                    try:
-                        metadata = destination.lstat()
-                    except FileNotFoundError as exc:
-                        raise WorkerRuntimeError(
-                            f"requested artifact is missing: {name}"
-                        ) from exc
-                    if destination.is_symlink():
-                        raise WorkerRuntimeError(
-                            f"artifact path contains a symbolic link: {name}"
-                        )
-                    if index < len(relative.parts) - 1 and not destination.is_dir():
+            return result.returncode == 0
+
+        for name in paths:
+            relative = _safe_relative_path(name)
+            current = PurePosixPath("/workspace")
+            for index, part in enumerate(relative.parts):
+                current = current / part
+                path = str(current)
+                if check(path, "-L"):
+                    raise WorkerRuntimeError(
+                        f"artifact path contains a symbolic link: {name}"
+                    )
+                predicate = "-d" if index < len(relative.parts) - 1 else "-f"
+                if not check(path, predicate):
+                    if index < len(relative.parts) - 1:
                         raise WorkerRuntimeError(
                             f"artifact parent is not a directory: {name}"
                         )
-                if not destination.is_file():
-                    raise WorkerRuntimeError(f"artifact is not a regular file: {name}")
-                if metadata.st_size > self.limits.max_artifact_bytes:
-                    raise WorkerRuntimeError(f"artifact exceeds size limit: {name}")
-                content = destination.read_bytes()
-                total += len(content)
-                if total > self.limits.max_artifacts_total_bytes:
-                    raise WorkerRuntimeError("artifacts exceed total byte limit")
-                artifacts[name] = content
+                    raise WorkerRuntimeError(f"requested artifact is missing: {name}")
+
+            size_result = subprocess.run(
+                [docker, "exec", container_name, "sh", "-c",
+                 "wc -c < \"$1\"", "sh", str(current)],
+                stdin=subprocess.DEVNULL, capture_output=True, timeout=10, check=False,
+            )
+            if size_result.returncode != 0:
+                raise WorkerRuntimeError(f"could not inspect requested artifact: {name}")
+            try:
+                size = int(size_result.stdout.strip())
+            except ValueError as exc:
+                raise WorkerRuntimeError(f"artifact size response is invalid: {name}") from exc
+            if size > self.limits.max_artifact_bytes:
+                raise WorkerRuntimeError(f"artifact exceeds size limit: {name}")
+            total += size
+            if total > self.limits.max_artifacts_total_bytes:
+                raise WorkerRuntimeError("artifacts exceed total byte limit")
+
+            content_result = subprocess.run(
+                [docker, "exec", container_name, "cat", str(current)],
+                stdin=subprocess.DEVNULL, capture_output=True, timeout=10, check=False,
+            )
+            if content_result.returncode != 0:
+                raise WorkerRuntimeError(f"could not read requested artifact: {name}")
+            if len(content_result.stdout) != size:
+                raise WorkerRuntimeError(f"artifact changed while being collected: {name}")
+            artifacts[name] = content_result.stdout
         return artifacts
 
     def _cleanup_container(self, docker: str, name: str) -> None:

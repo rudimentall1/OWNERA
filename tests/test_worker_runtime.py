@@ -84,6 +84,7 @@ def test_container_has_no_network_or_host_writable_mount(monkeypatch):
     assert args[args.index("--security-opt") + 1] == "no-new-privileges"
     assert "--memory" in args and "--cpus" in args and "--pids-limit" in args
     assert "--tmpfs" in args
+    assert "uid=65532,gid=65532" in " ".join(args)
     assert "dst=/inputs,readonly" in args[args.index("--mount") + 1]
     assert "/var/run/docker.sock" not in " ".join(args)
     assert result.status == "SUCCEEDED"
@@ -163,52 +164,37 @@ def test_cleanup_runs_when_artifact_collection_fails(monkeypatch):
     assert cleaned == [True]
 
 
-def test_artifact_collection_rejects_symlinked_parent_directory(monkeypatch, tmp_path):
+def test_artifact_collection_rejects_symlinked_parent_directory(monkeypatch):
     from types import SimpleNamespace
 
     runtime = DockerWorkerRuntime(IMAGE)
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "secret.txt").write_text("hostile target", encoding="utf-8")
 
     def fake_run(args, **kwargs):
-        destination = __import__("pathlib").Path(args[-1])
-        (destination / "linked").symlink_to(outside, target_is_directory=True)
-        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+        if args[3] == "sh" and args[5].startswith("test -L") and args[-1] == "/workspace/linked":
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+        return SimpleNamespace(returncode=1, stdout=b"", stderr=b"")
 
     monkeypatch.setattr("ownera.worker_runtime.subprocess.run", fake_run)
-
     with pytest.raises(WorkerRuntimeError, match="symbolic link"):
-        runtime._collect_artifacts(
-            "/usr/bin/docker", "container-id", ("linked/secret.txt",)
-        )
+        runtime._collect_artifacts("/usr/bin/docker", "container-id", ("linked/secret.txt",))
 
 
-def test_artifact_collection_rejects_symlinked_final_file(monkeypatch, tmp_path):
-    from pathlib import Path
+def test_artifact_collection_rejects_symlinked_final_file(monkeypatch):
     from types import SimpleNamespace
 
     runtime = DockerWorkerRuntime(IMAGE)
-    outside = tmp_path / "secret.txt"
-    outside.write_text("hostile target", encoding="utf-8")
 
     def fake_run(args, **kwargs):
-        destination = Path(args[-1])
-        (destination / "leak.txt").symlink_to(outside)
-        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+        if args[3] == "sh" and args[5].startswith("test -L") and args[-1] == "/workspace/leak.txt":
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+        return SimpleNamespace(returncode=1, stdout=b"", stderr=b"")
 
     monkeypatch.setattr("ownera.worker_runtime.subprocess.run", fake_run)
-
     with pytest.raises(WorkerRuntimeError, match="symbolic link"):
-        runtime._collect_artifacts(
-            "/usr/bin/docker", "container-id", ("leak.txt",)
-        )
+        runtime._collect_artifacts("/usr/bin/docker", "container-id", ("leak.txt",))
 
 
-def test_artifact_collection_copies_workspace_once_and_returns_regular_file(
-    monkeypatch, tmp_path
-):
-    from pathlib import Path
+def test_artifact_collection_reads_only_requested_regular_files(monkeypatch):
     from types import SimpleNamespace
 
     runtime = DockerWorkerRuntime(IMAGE)
@@ -216,17 +202,23 @@ def test_artifact_collection_copies_workspace_once_and_returns_regular_file(
 
     def fake_run(args, **kwargs):
         calls.append(args)
-        destination = Path(args[-1])
-        (destination / "report").mkdir()
-        (destination / "report" / "result.txt").write_bytes(b"verified")
-        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+        if args[3] == "sh":
+            script, path = args[5], args[-1]
+            if script.startswith("test -L"):
+                return SimpleNamespace(returncode=1, stdout=b"", stderr=b"")
+            if script.startswith("test -d"):
+                return SimpleNamespace(returncode=0 if path == "/workspace/report" else 1, stdout=b"", stderr=b"")
+            if script.startswith("test -f"):
+                return SimpleNamespace(returncode=0 if path == "/workspace/report/result.txt" else 1, stdout=b"", stderr=b"")
+            if script.startswith("wc -c"):
+                return SimpleNamespace(returncode=0, stdout=b"8\n", stderr=b"")
+        if args[3] == "cat":
+            return SimpleNamespace(returncode=0, stdout=b"verified", stderr=b"")
+        return SimpleNamespace(returncode=1, stdout=b"", stderr=b"unexpected command")
 
     monkeypatch.setattr("ownera.worker_runtime.subprocess.run", fake_run)
-
     result = runtime._collect_artifacts(
         "/usr/bin/docker", "container-id", ("report/result.txt",)
     )
-
     assert result == {"report/result.txt": b"verified"}
-    assert len(calls) == 1
-    assert calls[0][2] == "container-id:/workspace/."
+    assert any(call[3] == "cat" for call in calls)
