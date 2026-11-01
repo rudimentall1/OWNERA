@@ -94,7 +94,7 @@ def test_maximum_bounty_is_explicitly_a_ceiling_not_a_budget_floor():
         now=datetime(2026, 11, 1, tzinfo=timezone.utc),
     )[0]
 
-    assert candidate.max_bounty_usd == 250000
+    assert candidate.max_bounty_ceiling == 250000
     assert not hasattr(candidate, "budget_min")
     assert not hasattr(candidate, "guaranteed_revenue")
 
