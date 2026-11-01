@@ -77,6 +77,8 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Verify customer acceptance against a trusted contract or payment source
 - [ ] Select one narrow paid service with measurable demand and delivery criteria
 - [ ] Add manual-first paid-work lead intake and conservative qualification using the persistent commercial engine
+- [x] Add live NEAR Agent Market bid API integration with bounded USDC policy, dry-run, deterministic proposal generation, concurrency caps, and audit persistence (recurring submission remains disabled)
+- [ ] Enable recurring bids only after unattended assignment execution and payout reconciliation are proven
 - [ ] Validate one current client lead and prepare an owner-approved proposal
 - [x] Define isolated execution environments and bounded worker runtimes (initial digest-pinned Docker adapter)
 - [x] Add opt-in real-Docker acceptance tests and a manually triggered digest-pinned GitHub Actions workflow

@@ -16,6 +16,7 @@ from pathlib import Path
 from ownera.evidence_registry import SQLiteOpportunityEvidenceRegistry
 from ownera.near_market import sync_paid_work
 from ownera.near_market_assignments import sync_assignments
+from ownera.near_market_bidding import BidPolicy, run_bid_cycle
 from ownera.opportunity_intelligence import rank_immunefi
 from ownera.paid_work import PaidWorkPipeline
 from ownera.revenue_scout import LocalOllamaRevenueScout
@@ -169,6 +170,14 @@ def _paid_work(args: argparse.Namespace) -> int:
         report = retry_pending_deliveries(args.database)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1 if report["failures"] else 0
+    if args.paid_work_command == "bid-near-market":
+        report = run_bid_cycle(
+            args.database,
+            policy=BidPolicy.from_env(),
+            dry_run=not args.submit,
+        )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
     pipeline = PaidWorkPipeline(args.database)
     if args.paid_work_command == "sync-near-market":
         report = sync_paid_work(args.database)
@@ -316,6 +325,10 @@ def build_parser() -> argparse.ArgumentParser:
     delivery_retry = paid_commands.add_parser("retry-near-deliveries", help="resume prepared marketplace deliveries without rerunning workers")
     delivery_retry.add_argument("--database", default=default_db)
     delivery_retry.set_defaults(handler=_paid_work)
+    bidding = paid_commands.add_parser("bid-near-market", help="qualify public jobs and optionally submit bounded bids")
+    bidding.add_argument("--database", default=default_db)
+    bidding.add_argument("--submit", action="store_true", help="submit eligible bids; requires OWNERA_NEAR_BIDDING_ENABLED=true")
+    bidding.set_defaults(handler=_paid_work)
     ingest = paid_commands.add_parser("ingest", help="persist a manually sourced paid-work listing")
     ingest.add_argument("--database", default=default_db)
     ingest.add_argument("--payload-file", required=True)
