@@ -8,10 +8,10 @@ never submits reports or authorizes testing.
 from __future__ import annotations
 
 import json
+import typing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
@@ -25,7 +25,7 @@ class SourceAdapterError(RuntimeError):
     """A public source could not be safely fetched or parsed."""
 
 
-class EvidenceCapturePort(Protocol):
+class EvidenceCapturePort(typing.Protocol):
     def capture(
         self,
         *,
@@ -110,7 +110,7 @@ class ImmunefiPublicCatalogAdapter:
         if not isinstance(value, str) or not value.strip():
             raise SourceAdapterError(f"Immunefi record has invalid {field}")
         try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value)
         except ValueError as exc:
             raise SourceAdapterError(f"Immunefi record has invalid {field}") from exc
         if parsed.tzinfo is None:
