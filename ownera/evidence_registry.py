@@ -188,8 +188,6 @@ class SQLiteOpportunityEvidenceRegistry:
         source_name: str,
         source_url: str,
         content_snapshot: str,
-        captured_at: datetime | None = None,
-        evidence_id: UUID | None = None,
     ) -> OpportunityEvidence:
         if not source_name.strip():
             raise ValueError("source_name is required")
@@ -200,11 +198,8 @@ class SQLiteOpportunityEvidenceRegistry:
             raise ValueError("content_snapshot is required")
         if len(content_snapshot) > self.MAX_SNAPSHOT_CHARS:
             raise ValueError("content_snapshot exceeds the maximum allowed size")
-        timestamp = captured_at or datetime.now(timezone.utc)
-        if timestamp.tzinfo is None:
-            raise ValueError("captured_at must be timezone-aware")
-        timestamp = timestamp.astimezone(timezone.utc)
-        item_id = evidence_id or uuid4()
+        timestamp = datetime.now(timezone.utc)
+        item_id = uuid4()
         digest = self._content_digest(content_snapshot)
         connection = self._connect()
         try:
