@@ -173,3 +173,125 @@ def test_live_adapter_ingestion_writes_pending_evidence_to_real_registry(tmp_pat
     assert evidence.opportunity_id == candidates[0].opportunity_id
     assert evidence.status is EvidenceStatus.PENDING
     assert registry.verify(evidence.evidence_id)
+
+
+def test_repeated_import_is_idempotent_and_ignores_observation_timestamp(tmp_path):
+    registry = SQLiteOpportunityEvidenceRegistry(
+        tmp_path / "dedupe.db", OwnerAuthenticator()
+    )
+    adapter = ImmunefiPublicCatalogAdapter(registry)
+    first = adapter.ingest(
+        json.dumps([_record()]).encode(),
+        now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+    )[0]
+    second = adapter.ingest(
+        json.dumps([_record()]).encode(),
+        now=datetime(2026, 11, 2, tzinfo=timezone.utc),
+    )[0]
+
+    assert second.opportunity_id == first.opportunity_id
+    assert second.evidence_id == first.evidence_id
+    assert second.captured_at == first.captured_at
+    connection = registry._connect()
+    try:
+        assert connection.execute("SELECT COUNT(*) FROM opportunity_evidence").fetchone()[0] == 1
+        assert connection.execute("SELECT COUNT(*) FROM opportunity_evidence_events").fetchone()[0] == 1
+    finally:
+        connection.close()
+    assert registry.verify(first.evidence_id)
+
+
+def test_changed_program_terms_create_new_pending_evidence_version(tmp_path):
+    registry = SQLiteOpportunityEvidenceRegistry(
+        tmp_path / "versions.db", OwnerAuthenticator()
+    )
+    adapter = ImmunefiPublicCatalogAdapter(registry)
+    first = adapter.ingest(
+        json.dumps([_record()]).encode(),
+        now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+    )[0]
+    changed = adapter.ingest(
+        json.dumps([_record(maxBounty=300000)]).encode(),
+        now=datetime(2026, 11, 2, tzinfo=timezone.utc),
+    )[0]
+
+    assert changed.opportunity_id == first.opportunity_id
+    assert changed.evidence_id != first.evidence_id
+    assert registry.get(first.evidence_id).status is EvidenceStatus.PENDING
+    assert registry.get(changed.evidence_id).status is EvidenceStatus.PENDING
+    assert registry.verify(first.evidence_id)
+    assert registry.verify(changed.evidence_id)
+    connection = registry._connect()
+    try:
+        assert connection.execute("SELECT COUNT(*) FROM opportunity_evidence").fetchone()[0] == 2
+    finally:
+        connection.close()
+
+
+def test_lifecycle_updates_existing_source_and_reactivation_does_not_duplicate(tmp_path):
+    registry = SQLiteOpportunityEvidenceRegistry(
+        tmp_path / "lifecycle.db", OwnerAuthenticator()
+    )
+    adapter = ImmunefiPublicCatalogAdapter(registry)
+    active = adapter.ingest(
+        json.dumps([_record()]).encode(),
+        now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+    )[0]
+
+    adapter.ingest(
+        json.dumps([_record(isPaused=True)]).encode(),
+        now=datetime(2026, 11, 2, tzinfo=timezone.utc),
+    )
+    state = registry.source_observation("immunefi:example-protocol")
+    assert state["lifecycle_status"] == "PAUSED"
+
+    reactivated = adapter.ingest(
+        json.dumps([_record()]).encode(),
+        now=datetime(2026, 11, 3, tzinfo=timezone.utc),
+    )[0]
+    assert reactivated.opportunity_id == active.opportunity_id
+    assert reactivated.evidence_id == active.evidence_id
+    assert registry.source_observation("immunefi:example-protocol")["lifecycle_status"] == "ACTIVE"
+    connection = registry._connect()
+    try:
+        assert connection.execute("SELECT COUNT(*) FROM opportunity_evidence").fetchone()[0] == 1
+    finally:
+        connection.close()
+
+
+def test_inactive_listing_never_seen_active_does_not_create_opportunity(tmp_path):
+    registry = SQLiteOpportunityEvidenceRegistry(
+        tmp_path / "inactive.db", OwnerAuthenticator()
+    )
+    adapter = ImmunefiPublicCatalogAdapter(registry)
+    assert adapter.ingest(
+        json.dumps([_record(isPaused=True)]).encode(),
+        now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+    ) == ()
+    assert registry.source_observation("immunefi:example-protocol") is None
+
+
+
+def test_reverting_terms_creates_a_new_version_without_idempotency_collision(tmp_path):
+    registry = SQLiteOpportunityEvidenceRegistry(
+        tmp_path / "revert.db", OwnerAuthenticator()
+    )
+    adapter = ImmunefiPublicCatalogAdapter(registry)
+    initial = adapter.ingest(
+        json.dumps([_record(maxBounty=250000)]).encode(),
+        now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+    )[0]
+    changed = adapter.ingest(
+        json.dumps([_record(maxBounty=300000)]).encode(),
+        now=datetime(2026, 11, 2, tzinfo=timezone.utc),
+    )[0]
+    reverted = adapter.ingest(
+        json.dumps([_record(maxBounty=250000)]).encode(),
+        now=datetime(2026, 11, 3, tzinfo=timezone.utc),
+    )[0]
+
+    assert len({initial.evidence_id, changed.evidence_id, reverted.evidence_id}) == 3
+    assert initial.opportunity_id == changed.opportunity_id == reverted.opportunity_id
+    assert registry.verify(initial.evidence_id)
+    assert registry.verify(changed.evidence_id)
+    assert registry.verify(reverted.evidence_id)

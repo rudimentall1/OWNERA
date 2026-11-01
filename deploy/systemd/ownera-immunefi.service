@@ -1,0 +1,29 @@
+[Unit]
+Description=OWNERA read-only Immunefi opportunity discovery
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ownera
+Group=ownera
+WorkingDirectory=/opt/OWNERA
+Environment=PYTHONUNBUFFERED=1
+Environment=OWNERA_DB_PATH=/var/lib/ownera/ownera.sqlite3
+ExecStart=/opt/OWNERA/.venv/bin/ownera discover-immunefi --format text
+UMask=0027
+StateDirectory=ownera
+StateDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/ownera
+
+[Install]
+WantedBy=multi-user.target

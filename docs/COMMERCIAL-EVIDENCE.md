@@ -1,6 +1,6 @@
 # Commercial Opportunity Evidence Registry
 
-**Status:** SQLite evidence capture, owner review, integrity verification, and an optional fail-closed gate in persistent commercial qualification are implemented. The gate is enforced when `PersistentCommercialEngine` is constructed with the registry; legacy callers that omit the gate retain the previous behavior.  
+**Status:** SQLite evidence capture, owner review, integrity verification, fail-closed qualification gating, stable Immunefi source identity, semantic change tracking, and a read-only CLI intake are implemented. A daily systemd timer definition is provided in `deploy/systemd/`. The gate is enforced when `PersistentCommercialEngine` is constructed with the registry; legacy callers that omit the gate retain the previous behavior.
 **Code:** `ownera/evidence_registry.py`  
 **Tests:** `tests/test_evidence_registry.py`
 
@@ -28,6 +28,9 @@ The registry turns an opportunity's source material into a durable reviewable re
 ## API
 
 - `capture(...)` stores a PENDING evidence snapshot and a capture event atomically.
+- `capture_source_observation(...)` binds a stable source key to one opportunity ID and semantic fingerprint. Unchanged observations reuse the existing evidence; changed terms create a new PENDING evidence version in the same SQLite transaction as the source pointer update.
+- `update_source_lifecycle(...)` updates the latest observed lifecycle state only for a previously discovered source. It does not create an opportunity for a listing that has never been active.
+- `source_observation(...)` exposes the latest source identity, fingerprint, evidence pointer, lifecycle state, and observation time for diagnostics.
 - `review(credential, evidence_id, accept=...)` authenticates the owner, derives the reviewer from the principal, and stores the decision and event atomically.
 - `require_accepted(opportunity_id, evidence_refs)` fails closed unless every reference is a registry UUID, belongs to the same opportunity, is ACCEPTED, and still matches its content digest.
 - `verify(evidence_id)` checks the content digest and event hash chain.
@@ -40,3 +43,15 @@ The persistent commercial engine accepts an `evidence_gate` dependency. When sup
 2. Add source-specific capture adapters only after confirming permitted access and retention terms.
 3. Add production identity integration, session revocation, and phishing-resistant MFA.
 4. Add independent customer, contract, and payment verification. Owner-reviewed listing evidence is not settlement evidence.
+
+## Immunefi source identity and change tracking
+
+The Immunefi adapter uses `immunefi:<slug>` as its stable source key and a deterministic UUID derived from the canonical program URL as the opportunity ID. Its semantic fingerprint excludes only the observation timestamp. Re-fetching unchanged program terms therefore creates no duplicate evidence. Changes to rewards, assets, eligibility flags, scope, rules, or other captured terms create a new immutable PENDING evidence version under the same opportunity ID. Paused, invite-only, not-yet-launched, and ended listings update the latest lifecycle state only when the source was previously discovered as active. A listing first seen while inactive is not promoted into the opportunity registry.
+
+The source observation table stores the latest lifecycle state, not a full lifecycle transition journal. Evidence versions and their capture/review events remain independently hash-verifiable.
+
+## CLI and scheduled intake
+
+Install the project in its virtual environment and run `ownera discover-immunefi --database /var/lib/ownera/ownera.sqlite3 --format json`. The default database path can be overridden with `OWNERA_DB_PATH`. `python -m ownera` is also supported. The command requires no API key and performs only one public catalog GET plus local SQLite writes.
+
+`deploy/systemd/ownera-immunefi.service` runs the intake as the dedicated unprivileged `ownera` account with a read-only filesystem except `/var/lib/ownera`. `deploy/systemd/ownera-immunefi.timer` schedules one run daily at 06:30 UTC with a five-minute randomized delay. It does not scan targets, submit reports, send messages, spend funds, or execute financial actions.

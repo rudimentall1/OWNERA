@@ -140,3 +140,39 @@ OWNERA will not give a language model unrestricted access to production private 
 ## License
 
 TBD.
+
+
+## Read-only opportunity discovery
+
+After installing OWNERA with its project dependencies, run the first public-source intake:
+
+```bash
+ownera discover-immunefi --database /var/lib/ownera/ownera.sqlite3 --format json
+```
+
+Use `--payload-file path/to/catalog.json` to replay a saved catalog without network access. The command stores bounded PENDING evidence in SQLite and prints a machine-readable report. Repeated imports reuse unchanged evidence. A listed maximum bounty is only a ceiling, not expected revenue. This command does not scan targets, submit reports, contact programs, or move funds.
+
+
+## Opportunity Intelligence
+
+Generate an explainable research shortlist from captured Immunefi evidence:
+
+```bash
+ownera rank-immunefi --limit 10
+ownera rank-immunefi --format json
+```
+
+The score is a research-fit heuristic, not exploit probability, eligibility, expected payout, or revenue. It reads the evidence database without changing it. Review the [Charm Alpha Vaults V2 triage](docs/research/IMMUNEFI-CHARM-TRIAGE.md) for the first manually checked candidate.
+
+## Paid Work MVP
+
+The primary first-revenue path is a manual-first paid-work pipeline built on the persistent Commercial Engine:
+
+```bash
+ownera paid-work ingest --payload-file listing.json
+ownera paid-work list
+ownera paid-work assess --opportunity-id <UUID> --delivery-cost 5000 --platform-fee-rate 0.10 --contingency-rate 0.10 --win-probability 0.50 --minimum-net-margin 0.20 --terms-reviewed --eligibility-confirmed
+ownera paid-work draft --payload-file proposal.json
+```
+
+It captures evidence-backed listings, calculates conservative economics, and prepares owner-reviewable proposal drafts. It does not scrape marketplaces, contact customers, submit proposals, execute work, or record revenue. See [Paid Work MVP](docs/PAID-WORK-MVP.md).

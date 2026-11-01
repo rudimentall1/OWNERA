@@ -110,6 +110,19 @@ class SQLiteOpportunityEvidenceRegistry:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS source_observations (
+                    source_key TEXT PRIMARY KEY,
+                    opportunity_id TEXT NOT NULL,
+                    semantic_fingerprint TEXT NOT NULL,
+                    latest_evidence_id TEXT NOT NULL,
+                    lifecycle_status TEXT NOT NULL,
+                    observed_at TEXT NOT NULL,
+                    FOREIGN KEY(latest_evidence_id) REFERENCES opportunity_evidence(evidence_id)
+                )
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(
@@ -239,6 +252,148 @@ class SQLiteOpportunityEvidenceRegistry:
         finally:
             connection.close()
         return self.get(item_id)
+
+    def capture_source_observation(
+        self,
+        *,
+        source_key: str,
+        opportunity_id: UUID,
+        semantic_fingerprint: str,
+        source_name: str,
+        source_url: str,
+        content_snapshot: str,
+        lifecycle_status: str = "ACTIVE",
+        observed_at: datetime | None = None,
+    ) -> OpportunityEvidence:
+        """Capture a new immutable version only when source semantics change.
+
+        Source identity and semantic fingerprint are maintained transactionally
+        with the evidence row. Repeated observations of unchanged terms return
+        the existing evidence and do not create another audit event.
+        """
+        if not source_key.strip() or not semantic_fingerprint.strip():
+            raise ValueError("source_key and semantic_fingerprint are required")
+        if lifecycle_status != "ACTIVE":
+            raise ValueError("capture_source_observation only captures ACTIVE sources")
+        if not source_name.strip():
+            raise ValueError("source_name is required")
+        parsed = urlparse(source_url)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+            raise ValueError("source_url must be an absolute HTTPS URL without credentials")
+        if not isinstance(content_snapshot, str) or not content_snapshot.strip():
+            raise ValueError("content_snapshot is required")
+        if len(content_snapshot) > self.MAX_SNAPSHOT_CHARS:
+            raise ValueError("content_snapshot exceeds the maximum allowed size")
+        timestamp = observed_at or datetime.now(timezone.utc)
+        if timestamp.tzinfo is None:
+            raise ValueError("observed_at must be timezone-aware")
+        timestamp = timestamp.astimezone(timezone.utc)
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            previous = connection.execute(
+                "SELECT * FROM source_observations WHERE source_key=?",
+                (source_key,),
+            ).fetchone()
+            if previous is not None and previous["semantic_fingerprint"] == semantic_fingerprint:
+                if previous["opportunity_id"] != str(opportunity_id):
+                    raise EvidenceIntegrityError("source identity is bound to another opportunity")
+                evidence_id = UUID(previous["latest_evidence_id"])
+                connection.execute(
+                    "UPDATE source_observations SET lifecycle_status=?, observed_at=? WHERE source_key=?",
+                    (lifecycle_status, timestamp.isoformat(), source_key),
+                )
+                connection.commit()
+                return self.get(evidence_id)
+
+            evidence_id = uuid4()
+            digest = self._content_digest(content_snapshot)
+            connection.execute(
+                """
+                INSERT INTO opportunity_evidence(
+                    evidence_id,opportunity_id,source_name,source_url,captured_at,
+                    content_snapshot,content_sha256,status
+                ) VALUES(?,?,?,?,?,?,?,'PENDING')
+                """,
+                (
+                    str(evidence_id), str(opportunity_id), source_name.strip(),
+                    source_url, timestamp.isoformat(), content_snapshot, digest,
+                ),
+            )
+            self._append_event(
+                connection,
+                evidence_id=evidence_id,
+                event_type="EvidenceCaptured",
+                payload={
+                    "opportunity_id": str(opportunity_id),
+                    "source_name": source_name.strip(),
+                    "source_url": source_url,
+                    "captured_at": timestamp.isoformat(),
+                    "content_sha256": digest,
+                    "content_chars": len(content_snapshot),
+                    "status": EvidenceStatus.PENDING.value,
+                    "source_key": source_key,
+                    "semantic_fingerprint": semantic_fingerprint,
+                },
+                occurred_at=timestamp,
+                idempotency_key=f"source-capture:{source_key}:{evidence_id}",
+            )
+            connection.execute(
+                """
+                INSERT INTO source_observations(
+                    source_key,opportunity_id,semantic_fingerprint,latest_evidence_id,
+                    lifecycle_status,observed_at
+                ) VALUES(?,?,?,?,?,?)
+                ON CONFLICT(source_key) DO UPDATE SET
+                    semantic_fingerprint=excluded.semantic_fingerprint,
+                    latest_evidence_id=excluded.latest_evidence_id,
+                    lifecycle_status=excluded.lifecycle_status,
+                    observed_at=excluded.observed_at
+                """,
+                (
+                    source_key, str(opportunity_id), semantic_fingerprint,
+                    str(evidence_id), lifecycle_status, timestamp.isoformat(),
+                ),
+            )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+        return self.get(evidence_id)
+
+    def update_source_lifecycle(
+        self,
+        *,
+        source_key: str,
+        lifecycle_status: str,
+        observed_at: datetime | None = None,
+    ) -> bool:
+        """Update lifecycle only for a source identity already discovered as active."""
+        allowed = {"ACTIVE", "PAUSED", "INVITE_ONLY", "NOT_YET_LAUNCHED", "ENDED"}
+        if lifecycle_status not in allowed:
+            raise ValueError("unsupported source lifecycle status")
+        timestamp = observed_at or datetime.now(timezone.utc)
+        if timestamp.tzinfo is None:
+            raise ValueError("observed_at must be timezone-aware")
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE source_observations
+                SET lifecycle_status=?, observed_at=?
+                WHERE source_key=?
+                """,
+                (lifecycle_status, timestamp.astimezone(timezone.utc).isoformat(), source_key),
+            )
+            return cursor.rowcount == 1
+
+    def source_observation(self, source_key: str) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM source_observations WHERE source_key=?", (source_key,)
+            ).fetchone()
+        return dict(row) if row is not None else None
 
     def _owner(self, credential: str) -> AuthenticatedPrincipal:
         if not isinstance(credential, str) or not credential.strip():

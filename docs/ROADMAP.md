@@ -36,7 +36,12 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Define canonical resource-opportunity schema and provenance
 - [x] Add first read-only Immunefi public bounty catalog adapter with PENDING evidence capture
 - [ ] Add further approved public sources for grants, paid work, cloud credits, and compute
-- [ ] Normalize, deduplicate, rank, and expire opportunities
+- [x] Normalize and deduplicate Immunefi opportunities by stable source identity and semantic fingerprint
+- [x] Track latest Immunefi lifecycle state and preserve changed terms as new evidence versions
+- [x] Add read-only CLI intake with persistent SQLite storage and machine-readable reports
+- [x] Add a hardened daily systemd timer definition for public-source discovery
+- [x] Add explainable read-only research-fit ranking for captured Immunefi listings (not exploit probability or expected payout)
+- [ ] Rank and expire opportunities across additional approved sources
 - [ ] Check eligibility, ownership, terms, and required permissions
 - [ ] Produce an evidence-backed opportunity report
 - [ ] No external commitments, spending, or live financial execution in this phase
@@ -70,7 +75,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add fail-closed owner key-control service with verified-principal role checks and actor binding
 - [ ] Integrate production identity provider, phishing-resistant MFA, session revocation, and protected API boundary
 - [ ] Verify customer acceptance against a trusted contract or payment source
-- [ ] Select one narrow service with measurable demand and delivery criteria
+- [ ] Select one narrow paid service with measurable demand and delivery criteria
+- [ ] Add manual-first paid-work lead intake and conservative qualification using the persistent commercial engine
+- [ ] Validate one current client lead and prepare an owner-approved proposal
 - [x] Define isolated execution environments and bounded worker runtimes (initial digest-pinned Docker adapter)
 - [x] Add opt-in real-Docker acceptance tests and a manually triggered digest-pinned GitHub Actions workflow
 - [x] Reject symlinked parent directories during artifact extraction and cover the boundary with unit tests
@@ -96,8 +103,10 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add fail-closed evidence reference validation for accepted evidence belonging to the opportunity
 - [x] Enforce accepted evidence as a mandatory gate inside persistent commercial qualification
 - [x] Add first read-only Immunefi catalog adapter (candidate intake only; no automatic qualification)
-- [ ] Run live source intake, review real candidate listings, and validate access/retention constraints
-- [ ] Add source deduplication and change tracking
+- [x] Run live Immunefi source intake and verify idempotent persistence across repeat imports
+- [x] Add Immunefi source deduplication and semantic change tracking
+- [x] Review one real program against official scope and payout terms; close a non-qualifying local-only hypothesis without submission
+- [ ] Review and validate a second high-fit program with source-code provenance and reproducible local tests
 - [ ] Owner-approved contracts and customer commitments
 - [ ] Deliver work and independent quality review
 - [x] Add owner-attested partial receipt ledger with accepted-amount caps, idempotency, and atomic event persistence
@@ -149,3 +158,11 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 OWNERA should evolve into an owner-directed autonomous treasury and agent operation that can discover opportunities, deliver useful work, acquire permitted resources, earn revenue, manage an operating budget, and seek better risk-adjusted use of capital while protecting the owner's assets and preserving an owner-only Sovereign Reserve.
 
 A list of opportunities, a submitted application, a simulated balance, an invoice, a backtest, or a model's profit forecast is not proof of acquired resources or realized profit.
+
+## First revenue execution
+
+The current execution priority is documented in [docs/FIRST-REVENUE-PLAN.md](FIRST-REVENUE-PLAN.md). Paid fixed-scope work is the primary first-revenue channel; bug bounty research remains secondary because payout timing and probability are highly uncertain.
+
+## Paid Work first-revenue path
+
+The manual-first `ownera paid-work` CLI now persists source-backed listings, supports idempotent intake, records conservative economic assessments, and creates proposal drafts only for qualified opportunities. The next priority is to use it on real manually captured leads, then add only source integrations whose terms permit the intended use. Do not expand bounty research until the paid-work pipeline is being used for actual customer acquisition.

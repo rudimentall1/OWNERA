@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily OWNERA read-only Immunefi discovery schedule
+
+[Timer]
+OnCalendar=*-*-* 06:30:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=ownera-immunefi.service
+
+[Install]
+WantedBy=timers.target

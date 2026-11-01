@@ -8,6 +8,7 @@ never submits reports or authorizes testing.
 # ruff: noqa: I001
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,7 +16,7 @@ from decimal import Decimal
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
-from uuid import UUID, uuid4
+from uuid import UUID, NAMESPACE_URL, uuid5
 
 
 IMMUNEFI_CATALOG_URL = "https://immunefi.com/public-api/bounties.json"
@@ -59,6 +60,7 @@ class ImmunefiPublicCatalogAdapter:
         capture = getattr(evidence_registry, "capture", None)
         if not callable(capture):
             raise TypeError("evidence_registry must provide a callable capture method")
+        self._evidence_registry = evidence_registry
         self._capture_evidence = capture
 
     def fetch_payload(self) -> bytes:
@@ -258,12 +260,24 @@ class ImmunefiPublicCatalogAdapter:
                 if record["endDate"] is not None
                 else None
             )
-            if (
-                record["isPaused"]
-                or record["inviteOnly"]
-                or launch_date > fetched_at
-                or (end_date is not None and end_date <= fetched_at)
-            ):
+            lifecycle_status = (
+                "PAUSED" if record["isPaused"] else
+                "INVITE_ONLY" if record["inviteOnly"] else
+                "NOT_YET_LAUNCHED" if launch_date > fetched_at else
+                "ENDED" if end_date is not None and end_date <= fetched_at else
+                "ACTIVE"
+            )
+            source_key = f"immunefi:{slug}"
+            if lifecycle_status != "ACTIVE":
+                update_lifecycle = getattr(
+                    self._evidence_registry, "update_source_lifecycle", None
+                )
+                if callable(update_lifecycle):
+                    update_lifecycle(
+                        source_key=source_key,
+                        lifecycle_status=lifecycle_status,
+                        observed_at=fetched_at,
+                    )
                 continue
 
             max_bounty = record.get("maxBounty")
@@ -276,16 +290,42 @@ class ImmunefiPublicCatalogAdapter:
             ecosystems = self._string_tuple(record.get("ecosystem"), "ecosystem")
             languages = self._string_tuple(record.get("language"), "language")
             source_url = f"https://immunefi.com/bug-bounty/{quote(slug, safe='-_')}/"
-            opportunity_id = uuid4()
+            opportunity_id = uuid5(NAMESPACE_URL, f"https://immunefi.com/bug-bounty/{slug}/")
             snapshot = self._snapshot(
                 record, fetched_at=fetched_at, slug=slug, project=project
             )
-            evidence = self._capture_evidence(
-                opportunity_id=opportunity_id,
-                source_name=self.SOURCE_NAME,
-                source_url=source_url,
-                content_snapshot=snapshot,
+            semantic_snapshot = json.loads(snapshot)
+            semantic_snapshot.pop("retrieved_at", None)
+            semantic_fingerprint = hashlib.sha256(
+                json.dumps(
+                    semantic_snapshot,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest()
+            capture_observation = getattr(
+                self._evidence_registry, "capture_source_observation", None
             )
+            if callable(capture_observation):
+                evidence = capture_observation(
+                    source_key=source_key,
+                    opportunity_id=opportunity_id,
+                    semantic_fingerprint=semantic_fingerprint,
+                    source_name=self.SOURCE_NAME,
+                    source_url=source_url,
+                    content_snapshot=snapshot,
+                    lifecycle_status=lifecycle_status,
+                    observed_at=fetched_at,
+                )
+            else:
+                evidence = self._capture_evidence(
+                    opportunity_id=opportunity_id,
+                    source_name=self.SOURCE_NAME,
+                    source_url=source_url,
+                    content_snapshot=snapshot,
+                )
             candidates.append(
                 DiscoveredBounty(
                     opportunity_id=opportunity_id,
@@ -305,7 +345,7 @@ class ImmunefiPublicCatalogAdapter:
                     launch_date=launch_date,
                     end_date=end_date,
                     assets_count=len(record.get("assets", [])),
-                    captured_at=fetched_at,
+                    captured_at=getattr(evidence, "captured_at", fetched_at),
                 )
             )
         return tuple(candidates)
