@@ -59,6 +59,7 @@ class CapturedSource:
     sha256: str
     byte_size: int
     redirect_count: int
+    raw_content: bytes
 
     def to_dict(self) -> dict:
         return {
@@ -266,6 +267,7 @@ def fetch_public_source(
         sha256=hashlib.sha256(raw).hexdigest(),
         byte_size=len(raw),
         redirect_count=redirect_handler.redirect_count,
+        raw_content=raw,
     )
 
 
@@ -334,6 +336,13 @@ def collect_assignment_sources(database_path, assignment_id: str, *, opener=None
                 artifact_name=f"source-{index:02d}.json",
                 content=content,
                 media_type="application/json",
+            )
+            registry.put(
+                task_id=task_id,
+                worker_id=worker_id,
+                artifact_name=f"source-{index:02d}.raw",
+                content=item.raw_content,
+                media_type=item.content_type.split(";", 1)[0] or "application/octet-stream",
             )
             time.sleep(0.25)
         except (SourceCollectionError, OSError, ValueError, sqlite3.Error) as exc:

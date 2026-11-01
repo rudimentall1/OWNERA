@@ -124,12 +124,16 @@ def test_collect_assignment_sources_persists_hash_addressed_source_and_packet(tm
     from ownera.artifact_registry import SQLiteArtifactRegistry
     records = SQLiteArtifactRegistry(db_path).list_for_task(result["artifact_task_id"])
     assert {record.artifact_name for record in records} == {
-        "source-01.json", "source-02.json", "SOURCE_COLLECTION.md"
+        "source-01.json", "source-01.raw", "source-02.json",
+        "source-02.raw", "SOURCE_COLLECTION.md"
     }
     packet = next(record for record in records if record.artifact_name == "SOURCE_COLLECTION.md")
     text = SQLiteArtifactRegistry(db_path).get(packet.sha256).decode()
     assert "not a completed research report" in text
     assert url in text and hashlib.sha256(body).hexdigest() in text
+    raw_record = next(record for record in records if record.artifact_name == "source-01.raw")
+    assert SQLiteArtifactRegistry(db_path).get(raw_record.sha256) == body
+    assert raw_record.sha256 == hashlib.sha256(body).hexdigest()
 
 
 def test_collect_sources_requires_in_progress_assignment(tmp_path):

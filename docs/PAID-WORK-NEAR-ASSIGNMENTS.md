@@ -60,3 +60,8 @@ independent review stages remain separate gates.
 The collector also checks each source host's robots.txt before retrieval. A
 disallowed path or an unavailable robots policy fails closed for that source.
 Its systemd service and timer are versioned under deploy/systemd.
+
+Each successful capture stores both the extracted, structured source record and
+the original response bytes as separate immutable artifacts. The recorded raw
+SHA-256 is therefore independently reproducible from the preserved source
+snapshot, not merely from the extracted text.
