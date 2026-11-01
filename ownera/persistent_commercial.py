@@ -9,8 +9,8 @@ from uuid import UUID
 
 from ownera.commercial import (
     CommercialAssessment,
-    CommercialEvidenceGate,
     CommercialEngine,
+    CommercialEvidenceGate,
     CommercialOpportunity,
     ProposalDraft,
     QualificationResult,
