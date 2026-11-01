@@ -15,6 +15,7 @@ from pathlib import Path
 
 from ownera.evidence_registry import SQLiteOpportunityEvidenceRegistry
 from ownera.near_market import sync_paid_work
+from ownera.near_market_assignments import sync_assignments
 from ownera.opportunity_intelligence import rank_immunefi
 from ownera.paid_work import PaidWorkPipeline
 from ownera.revenue_scout import LocalOllamaRevenueScout
@@ -159,6 +160,10 @@ def _rank_immunefi(args: argparse.Namespace) -> int:
 
 
 def _paid_work(args: argparse.Namespace) -> int:
+    if args.paid_work_command == "sync-near-assignments":
+        report = sync_assignments(args.database)
+        print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+        return 0
     pipeline = PaidWorkPipeline(args.database)
     if args.paid_work_command == "sync-near-market":
         report = sync_paid_work(args.database)
@@ -300,6 +305,9 @@ def build_parser() -> argparse.ArgumentParser:
     near = paid_commands.add_parser("sync-near-market", help="read open NEAR Agent Market jobs into Paid Work")
     near.add_argument("--database", default=default_db)
     near.set_defaults(handler=_paid_work)
+    assignments = paid_commands.add_parser("sync-near-assignments", help="poll and persist direct-hire assignments")
+    assignments.add_argument("--database", default=default_db)
+    assignments.set_defaults(handler=_paid_work)
     ingest = paid_commands.add_parser("ingest", help="persist a manually sourced paid-work listing")
     ingest.add_argument("--database", default=default_db)
     ingest.add_argument("--payload-file", required=True)
