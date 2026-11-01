@@ -358,10 +358,17 @@ class SQLiteOpportunityEvidenceRegistry:
             review_note=row["review_note"],
         )
 
-    def require_accepted(self, opportunity_id: UUID, evidence_refs: tuple[str, ...]) -> None:
-        """Fail closed unless every referenced UUID is accepted evidence for this opportunity."""
+    def require_accepted(
+        self,
+        opportunity_id: UUID,
+        evidence_refs: tuple[str, ...],
+        *,
+        expected_source_url: str | None = None,
+    ) -> None:
+        """Fail closed unless evidence is accepted and bound to this opportunity."""
         if not evidence_refs:
             raise EvidenceRegistryError("at least one accepted evidence reference is required")
+        primary_source_matched = expected_source_url is None
         for reference in evidence_refs:
             try:
                 evidence_id = UUID(reference)
@@ -372,7 +379,13 @@ class SQLiteOpportunityEvidenceRegistry:
                 raise EvidenceRegistryError("evidence belongs to a different opportunity")
             if item.status is not EvidenceStatus.ACCEPTED:
                 raise EvidenceRegistryError("evidence has not been accepted by the owner")
+            if expected_source_url is not None and item.source_url == expected_source_url:
+                primary_source_matched = True
             self.verify(evidence_id)
+        if not primary_source_matched:
+            raise EvidenceRegistryError(
+                "accepted evidence does not match the opportunity source URL"
+            )
 
     def verify(self, evidence_id: UUID) -> bool:
         item = self.get(evidence_id)
@@ -424,7 +437,12 @@ class SQLiteOpportunityEvidenceRegistry:
         if len(rows) not in (1, 2):
             raise EvidenceIntegrityError("evidence audit contains an invalid event sequence")
         if len(rows) == 1:
-            if item.status is not EvidenceStatus.PENDING or item.reviewed_by is not None:
+            if (
+                item.status is not EvidenceStatus.PENDING
+                or item.reviewed_by is not None
+                or item.reviewed_at is not None
+                or item.review_note is not None
+            ):
                 raise EvidenceIntegrityError("evidence row has review fields without a review event")
         else:
             review = json.loads(rows[1]["payload_json"])
