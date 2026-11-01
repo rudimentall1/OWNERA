@@ -1,0 +1,11 @@
+[Unit]
+Description=Run OWNERA NEAR research source collector every minute
+
+[Timer]
+OnBootSec=75s
+OnUnitActiveSec=60s
+AccuracySec=15s
+Unit=ownera-near-research-collector.service
+
+[Install]
+WantedBy=timers.target

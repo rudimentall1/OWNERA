@@ -35,3 +35,28 @@ claim that source verification or independent semantic review has happened.
 The assignment poll can prepare the plan as soon as a supported award appears;
 the source-fetcher, report-generation, and independent-review worker remain
 separate implementation gates.
+
+## Bounded public-source collection
+
+The collect-near-research worker runs from a one-minute systemd timer and only
+considers assignments whose locally synced marketplace status is in_progress.
+It re-derives the research plan from the stored original marketplace payload and
+requires an exact plan match before opening any source. This prevents a modified
+plan row from adding arbitrary destinations.
+
+The collector fetches only exact URLs from the deterministic plan and only
+allowlisted HTTPS hosts, rejects non-public DNS answers, restricts redirects to
+the plan's approved hosts, enforces a 1.5 MB response limit and a 15-second
+request timeout, and extracts HTML, JSON, or plain text. Source bytes and their
+SHA-256 hashes are stored in the content-addressed artifact registry. A
+SOURCE_COLLECTION.md packet records the captured pages, timestamps, hashes,
+and failures.
+
+This stage is SOURCE_COLLECTION_ONLY. It does not interpret page text as
+instructions, create factual conclusions, claim semantic review, start an
+assignment, or submit a marketplace deliverable. The report synthesis and
+independent review stages remain separate gates.
+
+The collector also checks each source host's robots.txt before retrieval. A
+disallowed path or an unavailable robots policy fails closed for that source.
+Its systemd service and timer are versioned under deploy/systemd.
