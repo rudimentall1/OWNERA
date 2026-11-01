@@ -125,7 +125,7 @@ def test_real_container_output_limit_is_enforced():
 
 def test_real_container_symlink_artifact_is_rejected():
     runtime = _runtime()
-    with pytest.raises(WorkerRuntimeError, match="regular file"):
+    with pytest.raises(WorkerRuntimeError, match="symbolic link"):
         runtime.execute(
             WorkerExecutionRequest(
                 "integration-symlink-artifact",
