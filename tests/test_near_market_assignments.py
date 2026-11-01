@@ -60,3 +60,56 @@ def test_fetch_assignments_requests_all_statuses_and_paginates(monkeypatch):
     assert len(rows) == 201
     assert [int(call["offset"][0]) for call in calls] == [0, 100, 200]
     assert all(call["status"] == ["all"] and call["limit"] == ["100"] for call in calls)
+
+
+def test_assignment_sync_prepares_deterministic_non_executable_research_plan(tmp_path):
+    import json
+    import sqlite3
+
+    db = tmp_path / "ownera.sqlite3"
+    item = {
+        "assignment": {
+            "assignmentId": "research-1",
+            "jobId": "job-research-1",
+            "status": "in_progress",
+            "startedAt": "2026-11-01T12:00:00Z",
+        },
+        "job": {
+            "jobId": "job-research-1",
+            "title": "[internal research] Economics of micro-jobs on a marketplace with held payments and a judge",
+            "description": "Deliver English Markdown. Cite every factual claim with a URL actually opened. Model $0.05, $0.20, $1 and $5.",
+        },
+    }
+
+    first = sync_assignments(db, assignments=[item])
+    assert first.plans_prepared == 1
+    with sqlite3.connect(db) as connection:
+        row = connection.execute(
+            "SELECT plan_sha256,plan_json,state FROM near_market_assignment_plans WHERE assignment_id='research-1'"
+        ).fetchone()
+    plan = json.loads(row[1])
+    assert row[0] == plan["plan_sha256"]
+    assert row[2] == "PLAN_READY_NOT_EXECUTABLE"
+    assert plan["plan_key"] == "micro_job_economics"
+    assert plan["word_count"] == {"minimum": 1000, "maximum": 2500}
+    assert "command" not in plan
+    assert plan["execution_blockers"]
+
+
+def test_assignment_sync_does_not_plan_unsupported_or_unstarted_assignments(tmp_path):
+    import sqlite3
+
+    db = tmp_path / "ownera.sqlite3"
+    unsupported = {
+        "assignment": {"assignmentId": "unknown-1", "jobId": "job-unknown", "status": "in_progress"},
+        "job": {"jobId": "job-unknown", "title": "Build a video dubbing agent", "description": "Generate dubbed video."},
+    }
+    unstarted = {
+        "assignment": {"assignmentId": "not-started-1", "jobId": "job-known", "status": "completed"},
+        "job": {"jobId": "job-known", "title": "Find SageKai Agent", "description": "Find the exact public agent."},
+    }
+    report = sync_assignments(db, assignments=[unsupported, unstarted])
+    assert report.plans_prepared == 0
+    with sqlite3.connect(db) as connection:
+        count = connection.execute("SELECT COUNT(*) FROM near_market_assignment_plans").fetchone()[0]
+    assert count == 0

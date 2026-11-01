@@ -20,14 +20,16 @@ class AssignmentSyncReport:
     created: int
     unchanged: int
     ignored: int
+    plans_prepared: int = 0
 
     def to_dict(self) -> dict:
         return {
-            "schema": "ownera.near-market-assignment-sync.v1",
+            "schema": "ownera.near-market-assignment-sync.v2",
             "fetched": self.fetched,
             "created": self.created,
             "unchanged": self.unchanged,
             "ignored": self.ignored,
+            "plans_prepared": self.plans_prepared,
             "external_actions": "none",
         }
 
@@ -78,7 +80,7 @@ def fetch_assignments(token: str | None = None, *, opener=urlopen, page_size: in
 def sync_assignments(database_path: str | Path, *, token: str | None = None, assignments: list[dict] | None = None) -> AssignmentSyncReport:
     rows = fetch_assignments(token) if assignments is None else assignments
     db = sqlite3.connect(str(database_path))
-    created = unchanged = ignored = 0
+    created = unchanged = ignored = plans_prepared = 0
     try:
         db.execute("""CREATE TABLE IF NOT EXISTS near_market_assignments (
             assignment_id TEXT PRIMARY KEY,
@@ -87,6 +89,15 @@ def sync_assignments(database_path: str | Path, *, token: str | None = None, ass
             payload_json TEXT NOT NULL,
             first_seen_at TEXT NOT NULL,
             last_seen_at TEXT NOT NULL
+        )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS near_market_assignment_plans (
+            assignment_id TEXT PRIMARY KEY,
+            job_id TEXT NOT NULL,
+            plan_sha256 TEXT NOT NULL,
+            plan_json TEXT NOT NULL,
+            state TEXT NOT NULL CHECK(state IN ('PLAN_READY_NOT_EXECUTABLE','NOT_ACTIVE')),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         )""")
         now = datetime.now(timezone.utc).isoformat()
         for item in rows:
@@ -111,7 +122,34 @@ def sync_assignments(database_path: str | Path, *, token: str | None = None, ass
                 else:
                     db.execute("UPDATE near_market_assignments SET job_id=?, status=?, payload_json=?, last_seen_at=? WHERE assignment_id=?", (job_id, status, encoded, now, assignment_id))
                     created += 1
+
+            # A deterministic plan is persisted for supported active research
+            # jobs. It contains no executable command and causes no external action.
+            from ownera.near_market_research_planner import build_assignment_plan
+            plan = build_assignment_plan(item)
+            if plan is not None:
+                plan_json = json.dumps(plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+                cursor = db.execute(
+                    """INSERT INTO near_market_assignment_plans
+                       (assignment_id,job_id,plan_sha256,plan_json,state,created_at,updated_at)
+                       VALUES(?,?,?,?,?,?,?)
+                       ON CONFLICT(assignment_id) DO UPDATE SET
+                         job_id=excluded.job_id,
+                         plan_sha256=excluded.plan_sha256,
+                         plan_json=excluded.plan_json,
+                         state=excluded.state,
+                         updated_at=excluded.updated_at
+                       WHERE near_market_assignment_plans.plan_sha256 != excluded.plan_sha256
+                          OR near_market_assignment_plans.state != excluded.state""",
+                    (assignment_id, job_id, plan["plan_sha256"], plan_json, plan["execution_state"], now, now),
+                )
+                plans_prepared += max(0, cursor.rowcount)
+            elif status.casefold() not in {"assigned", "accepted", "started", "in_progress"}:
+                db.execute(
+                    "UPDATE near_market_assignment_plans SET state='NOT_ACTIVE',updated_at=? WHERE assignment_id=? AND state='PLAN_READY_NOT_EXECUTABLE'",
+                    (now, assignment_id),
+                )
         db.commit()
     finally:
         db.close()
-    return AssignmentSyncReport(len(rows), created, unchanged, ignored)
+    return AssignmentSyncReport(len(rows), created, unchanged, ignored, plans_prepared)
