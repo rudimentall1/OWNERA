@@ -263,3 +263,45 @@ def test_persistent_qualification_requires_accepted_registry_evidence(tmp_path):
     restarted = PersistentCommercialEngine(str(database), evidence_gate=registry)
     restored_result = restarted.assess(assessment)
     assert restored_result.status is OpportunityStatus.QUALIFIED
+
+
+def test_qualification_rejects_accepted_evidence_for_another_source_url(tmp_path):
+    database = tmp_path / "ownera.db"
+    registry = SQLiteOpportunityEvidenceRegistry(database, StaticAuthenticator())
+    opportunity_id = uuid4()
+    evidence = registry.capture(
+        opportunity_id=opportunity_id,
+        source_name="Public bounty board",
+        source_url="https://example.com/listing/real",
+        content_snapshot="Reviewed scope and reward.",
+    )
+    registry.review("valid", evidence.evidence_id, accept=True)
+    opportunity = CommercialOpportunity(
+        opportunity_id=opportunity_id,
+        title="Paid API security review",
+        description="Review a bounded API authorization scope.",
+        source_name="Public bounty board",
+        source_url="https://example.com/listing/forged",
+        budget_min=Decimal("500"),
+        budget_max=Decimal("700"),
+        currency="EUR",
+        required_capabilities=frozenset({"python", "security"}),
+        evidence_refs=(str(evidence.evidence_id),),
+    )
+    assessment = CommercialAssessment(
+        opportunity_id=opportunity_id,
+        estimated_delivery_cost=Decimal("100"),
+        platform_fee_rate=Decimal("0.10"),
+        contingency_rate=Decimal("0.10"),
+        win_probability=Decimal("0.50"),
+        minimum_net_margin=Decimal("0.20"),
+        terms_reviewed=True,
+        eligibility_confirmed=True,
+    )
+    commercial = PersistentCommercialEngine(str(database), evidence_gate=registry)
+    commercial.add_opportunity(opportunity)
+
+    result = commercial.assess(assessment)
+
+    assert result.status is OpportunityStatus.NEEDS_REVIEW
+    assert "evidence_not_owner_accepted" in result.reasons
