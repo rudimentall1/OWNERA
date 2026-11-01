@@ -213,3 +213,16 @@ def test_delivery_reconciliation_resumes_partial_uploads_without_worker(tmp_path
     with sqlite3.connect(db_path) as db:
         state = db.execute("SELECT state FROM near_market_delivery_outbox WHERE assignment_id='assignment-partial'").fetchone()[0]
     assert state == "SUBMITTED"
+
+
+def test_retry_pending_deliveries_is_noop_without_outbox_work(tmp_path):
+    from ownera.near_market_lifecycle import retry_pending_deliveries
+
+    class NoCallLifecycle:
+        def __init__(self):
+            self.calls = 0
+    result = retry_pending_deliveries(tmp_path / "ownera.sqlite3", lifecycle=NoCallLifecycle())
+    assert result["pending"] == 0
+    assert result["completed"] == []
+    assert result["failures"] == []
+    assert result["worker_execution"] == "none"

@@ -1,0 +1,11 @@
+[Unit]
+Description=Reconcile pending NEAR Agent Market deliveries every two minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2min
+AccuracySec=15s
+Unit=ownera-near-delivery-retry.service
+
+[Install]
+WantedBy=timers.target

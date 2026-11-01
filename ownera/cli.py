@@ -164,6 +164,11 @@ def _paid_work(args: argparse.Namespace) -> int:
         report = sync_assignments(args.database)
         print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
         return 0
+    if args.paid_work_command == "retry-near-deliveries":
+        from ownera.near_market_lifecycle import retry_pending_deliveries
+        report = retry_pending_deliveries(args.database)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1 if report["failures"] else 0
     pipeline = PaidWorkPipeline(args.database)
     if args.paid_work_command == "sync-near-market":
         report = sync_paid_work(args.database)
@@ -308,6 +313,9 @@ def build_parser() -> argparse.ArgumentParser:
     assignments = paid_commands.add_parser("sync-near-assignments", help="poll and persist direct-hire assignments")
     assignments.add_argument("--database", default=default_db)
     assignments.set_defaults(handler=_paid_work)
+    delivery_retry = paid_commands.add_parser("retry-near-deliveries", help="resume prepared marketplace deliveries without rerunning workers")
+    delivery_retry.add_argument("--database", default=default_db)
+    delivery_retry.set_defaults(handler=_paid_work)
     ingest = paid_commands.add_parser("ingest", help="persist a manually sourced paid-work listing")
     ingest.add_argument("--database", default=default_db)
     ingest.add_argument("--payload-file", required=True)

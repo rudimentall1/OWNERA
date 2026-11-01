@@ -334,3 +334,31 @@ def execute_and_deliver_assignment(
     _persist_delivery(database_path, assignment_id, spec.request.task_id, markdown)
     remote_submission = retry_prepared_delivery(assignment_id, database_path=database_path, lifecycle=lifecycle)
     return local_submission, remote_submission
+
+
+def retry_pending_deliveries(database_path, *, lifecycle: NearMarketLifecycle | None = None) -> dict:
+    """Reconcile/retry durable deliveries without starting or rerunning workers."""
+    import sqlite3
+
+    _init_delivery_outbox(database_path)
+    with sqlite3.connect(str(database_path), timeout=10) as db:
+        rows = db.execute(
+            "SELECT assignment_id,state FROM near_market_delivery_outbox "
+            "WHERE state IN ('PREPARING','READY_TO_SUBMIT') ORDER BY updated_at"
+        ).fetchall()
+    api = lifecycle or NearMarketLifecycle()
+    completed = []
+    failures = []
+    for assignment_id, state in rows:
+        try:
+            result = retry_prepared_delivery(assignment_id, database_path=database_path, lifecycle=api)
+            completed.append({"assignment_id": assignment_id, "status": result.status})
+        except (NearMarketError, OSError, ValueError, RuntimeError, sqlite3.Error) as exc:  # Keep later deliveries moving; expose bounded error text.
+            failures.append({"assignment_id": assignment_id, "state": state, "error": f"{type(exc).__name__}: {str(exc)[:300]}"})
+    return {
+        "schema": "ownera.near-market-delivery-retry.v1",
+        "pending": len(rows),
+        "completed": completed,
+        "failures": failures,
+        "worker_execution": "none",
+    }
