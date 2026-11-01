@@ -56,6 +56,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 
 ## 4 — Earned Revenue and Agent Workforce
 
+**Funding constraint:** follow [Self-Funded Autonomy](SELF-FUNDED-AUTONOMY.md). OWNERA starts with zero owner-funded operating budget. Paid services may be purchased only from independently verified net revenue; the Sovereign Reserve is never an agent funding source.
+
+
 - [x] Define initial worker/task contract and deterministic in-memory assignment/review lifecycle
 - [x] Add initial SQLite append-only event store with optimistic concurrency and hash-chain verification
 - [x] Add versioned SQLite workforce snapshot repository with restart recovery and digest verification
@@ -119,6 +122,11 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Add independently verified payment-provider or on-chain settlement adapters
 - [ ] Verify settlement and calculate realized net profit/loss
 - [ ] Add a capped agent operating budget only after the workflow is proven
+- [ ] Implement independently verified settlement-to-net-revenue reconciliation
+- [ ] Implement atomic allocation across pending receipts, Sovereign Reserve deposits, and earned operating treasury
+- [ ] Implement task-bound expense authorization from earned funds only, with allowlists, hard caps, and idempotent payment receipts
+- [ ] Prove zero-owner-funding bootstrap using free/local infrastructure through first verified customer receipt
+- [ ] Prove automatic operating-budget replenishment from earned net revenue without reserve access
 
 ## 5 — Autonomous Treasury and Capital Allocation
 

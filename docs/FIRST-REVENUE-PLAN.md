@@ -88,3 +88,8 @@ The Docker worker remains network-isolated and needs a trusted execution spec;
 a general planner and dependable model provider are not configured yet. Do not
 enable recurring bidding until the first accepted assignment can be executed,
 reviewed, delivered, and reconciled without manual intervention.
+
+
+## Zero-owner-funding rule
+
+The first-revenue path must not depend on the owner buying API credits or subscriptions. Before verified receipts, use existing server capacity, local/open-source models where they actually work, and free services within their terms. Paid infrastructure is permitted only after it can be funded from independently verified net revenue in the Earned Operating Treasury. The Sovereign Reserve is deposit-only for agents and cannot fund operating expenses. See [Self-Funded Autonomy](SELF-FUNDED-AUTONOMY.md) for the funding waterfall, expense controls, and required proofs.
