@@ -6,7 +6,7 @@
 
 ## Purpose
 
-The commercial intake and qualification boundary is documented in [Commercial Engine](COMMERCIAL-ENGINE.md). The customer-accepted order gate and task graph conversion are documented in [Order-to-Workforce Handoff](ORDER-HANDOFF.md). A proposal approval is not a customer acceptance or a delivery authorization.
+The commercial intake and qualification boundary is documented in [Commercial Engine](COMMERCIAL-ENGINE.md). Public paid-work discovery is documented in [Opportunity Intelligence](OPPORTUNITY-INTELLIGENCE.md). The customer-accepted order gate and task graph conversion are documented in [Order-to-Workforce Handoff](ORDER-HANDOFF.md). A proposal approval is not a customer acceptance or a delivery authorization.
 
 The Workforce Engine coordinates specialist agents that execute customer work. It is not a single “production agent” and it is not an LLM runtime. It owns the task contract, worker eligibility, assignment, dependency gates, budget checks, and independent review lifecycle.
 
@@ -110,6 +110,9 @@ Remaining acceptance work:
 
 ### Gate 3 — First commercial delivery loop
 
+- Free OpenRadar guest-feed intake and manual-first paid-work persistence are available.
+- Verify the original buyer page and current status; guest-feed records remain OBSERVED until then.
+- Connect one approved order to a bounded execution path.
 - Add a narrow service catalog with fixed scope and acceptance criteria.
 - Convert an owner-approved paid order into a task graph.
 - Assign implementation and QA workers.

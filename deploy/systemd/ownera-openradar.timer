@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily OWNERA read-only OpenRadar guest-feed schedule
+
+[Timer]
+OnCalendar=*-*-* 07:15:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=ownera-openradar.service
+
+[Install]
+WantedBy=timers.target

@@ -4,6 +4,19 @@
 
 Turn captured public bounty listings into a small, explainable research queue. The first adapter is read-only and consumes the local Immunefi evidence registry.
 
+## Free gig discovery
+
+A second, read-only adapter consumes the public [OpenRadar guest feed](https://openradar.fun/v2/feed). It requests `type=gig` only, stores immutable source snapshots in the same SQLite evidence registry, and deduplicates repeated records. The guest feed is delayed by 12 hours and hides contact details, so every imported item is `OBSERVED` / `source_status=UNKNOWN`. It is not marked open merely because it appears in the feed. The original marketplace page must be checked before a lead can become actionable.
+
+The deterministic OWNERA relevance score measures overlap with Python/backend, Telegram, deployment, Web3/security, API integration, and parsing capabilities. It is not an AI quality score, buyer verification, win probability, expected payment, or revenue. Seller offers, advertisements, vacancies and buyer requests still need manual separation.
+
+```bash
+ownera discover-openradar --limit 100
+ownera discover-openradar --limit 200 --format json
+```
+
+The public guest feed hides contacts. The adapter never attempts login, contact extraction, bidding, or messaging.
+
 ## Command
 
 ```bash

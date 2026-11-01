@@ -267,14 +267,17 @@ class SQLiteOpportunityEvidenceRegistry:
     ) -> OpportunityEvidence:
         """Capture a new immutable version only when source semantics change.
 
+        ACTIVE means the upstream adapter independently verified an active source.
+        OBSERVED means a feed mentioned the item but its original-page status is
+        unknown. This is deliberately distinct from an active opportunity.
         Source identity and semantic fingerprint are maintained transactionally
         with the evidence row. Repeated observations of unchanged terms return
         the existing evidence and do not create another audit event.
         """
         if not source_key.strip() or not semantic_fingerprint.strip():
             raise ValueError("source_key and semantic_fingerprint are required")
-        if lifecycle_status != "ACTIVE":
-            raise ValueError("capture_source_observation only captures ACTIVE sources")
+        if lifecycle_status not in {"ACTIVE", "OBSERVED"}:
+            raise ValueError("capture_source_observation requires ACTIVE or OBSERVED lifecycle status")
         if not source_name.strip():
             raise ValueError("source_name is required")
         parsed = urlparse(source_url)

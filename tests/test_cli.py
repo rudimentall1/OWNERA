@@ -109,3 +109,45 @@ def test_rank_immunefi_excludes_invite_only_from_research_queue(tmp_path, capsys
     assert main(["rank-immunefi", "--database", str(database), "--format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["result_count"] == 0
+
+
+def test_discover_openradar_cli_reports_guest_feed_as_observed(monkeypatch, tmp_path, capsys):
+    from datetime import datetime, timezone
+    from uuid import uuid4
+
+    from ownera.sources.openradar import DiscoveredGig
+
+    class FakeAdapter:
+        FEED_DELAY_HOURS = 12
+
+        def __init__(self, registry):
+            assert registry is not None
+
+        def discover(self, *, limit):
+            assert limit == 25
+            return (DiscoveredGig(
+                gig_id=uuid4(), evidence_id=uuid4(), title="Нужен Python developer",
+                text="Ищу исполнителя для Python API",
+                source_url="https://kwork.ru/projects/1",
+                canonical_url="https://kwork.ru/projects/1",
+                published_at=datetime(2026, 11, 1, tzinfo=timezone.utc),
+                created_at=datetime(2026, 11, 1, tzinfo=timezone.utc),
+                budget=None, currency=None, payment_period="fixed", skills=("Python",),
+                source_platform="kwork", feed_score=70, relevance_score=42,
+                relevance_reasons=("capability_match:python_backend",),
+                buyer_intent="BUYER_REQUEST_SIGNAL", source_status="UNKNOWN",
+                lifecycle_status="OBSERVED", contacts_available=False,
+            ),)
+
+    monkeypatch.setattr("ownera.cli.OpenRadarPublicFeedAdapter", FakeAdapter)
+    database = tmp_path / "ownera.sqlite3"
+    assert main([
+        "discover-openradar", "--database", str(database),
+        "--limit", "25", "--format", "json",
+    ]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["candidate_count"] == 1
+    assert report["feed_delay_hours"] == 12
+    assert report["contacts_available"] is False
+    assert report["candidates"][0]["source_status"] == "UNKNOWN"
+    assert report["candidates"][0]["lifecycle_status"] == "OBSERVED"

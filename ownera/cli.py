@@ -16,7 +16,9 @@ from pathlib import Path
 from ownera.evidence_registry import SQLiteOpportunityEvidenceRegistry
 from ownera.opportunity_intelligence import rank_immunefi
 from ownera.paid_work import PaidWorkPipeline
+from ownera.revenue_scout import LocalOllamaRevenueScout
 from ownera.sources.immunefi import ImmunefiPublicCatalogAdapter
+from ownera.sources.openradar import OpenRadarPublicFeedAdapter
 
 
 class _NoOwnerAuthentication:
@@ -78,6 +80,55 @@ def _discover_immunefi(args: argparse.Namespace) -> int:
             ceiling = item["max_bounty_ceiling"] or "not listed"
             print(f"- {item['project']} | ceiling={ceiling} | {item['source_url']}")
         print("All candidates remain PENDING_OWNER_REVIEW; no external action was taken.")
+    return 0
+
+
+def _discover_openradar(args: argparse.Namespace) -> int:
+    database_path = Path(args.database)
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    registry = SQLiteOpportunityEvidenceRegistry(
+        database_path, authenticator=_NoOwnerAuthentication()
+    )
+    adapter = OpenRadarPublicFeedAdapter(registry)
+    candidates = adapter.discover(limit=args.limit)
+    sorted_candidates = sorted(
+        candidates,
+        key=lambda item: (
+            item.relevance_score,
+            item.published_at,
+            item.feed_score if item.feed_score is not None else -1,
+        ),
+        reverse=True,
+    )
+    report = {
+        "schema": "ownera.openradar-discovery.v1",
+        "source_mode": "public_guest_feed",
+        "database": str(database_path.resolve()),
+        "feed_delay_hours": adapter.FEED_DELAY_HOURS,
+        "contacts_available": False,
+        "source_status_default": "UNKNOWN",
+        "note": "OBSERVED means present in delayed feed, not verified open on the original platform. Feed score and OWNERA relevance score are not expected income or win probability.",
+        "candidate_count": len(sorted_candidates),
+        "candidates": [item.to_dict() for item in sorted_candidates],
+    }
+    if args.format == "json":
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(
+            f"OpenRadar guest feed: {len(sorted_candidates)} gigs; "
+            f"feed delay={adapter.FEED_DELAY_HOURS}h; contacts hidden"
+        )
+        for item in sorted_candidates[:30]:
+            budget = (
+                f"{item.budget} {item.currency or ''}".strip()
+                if item.budget is not None else "budget unknown"
+            )
+            print(
+                f"- [{item.relevance_score}/100] {item.title} | "
+                f"{budget} | {item.published_at.isoformat()} | "
+                f"{item.buyer_intent} | STATUS UNKNOWN | {item.source_url}"
+            )
+        print("All feed records are OBSERVED/PENDING evidence; verify original status before action.")
     return 0
 
 
@@ -183,6 +234,15 @@ def _paid_work(args: argparse.Namespace) -> int:
     raise ValueError("unknown paid-work command")
 
 
+def _qualify_paid_work(args: argparse.Namespace) -> int:
+    payload = json.loads(Path(args.input_file).read_text(encoding="utf-8"))
+    assessment = LocalOllamaRevenueScout(
+        base_url=args.base_url, model=args.model, timeout_seconds=args.timeout
+    ).qualify(payload)
+    print(json.dumps(assessment.to_dict(), ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ownera",
@@ -199,6 +259,15 @@ def build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--format", choices=("text", "json"), default="text")
     discover.set_defaults(handler=_discover_immunefi)
 
+    openradar = commands.add_parser(
+        "discover-openradar",
+        help="capture public OpenRadar gig feed as OBSERVED evidence (not verified open)",
+    )
+    openradar.add_argument("--database", default=default_db)
+    openradar.add_argument("--limit", type=int, default=100)
+    openradar.add_argument("--format", choices=("text", "json"), default="text")
+    openradar.set_defaults(handler=_discover_openradar)
+
     rank = commands.add_parser(
         "rank-immunefi",
         help="rank captured Immunefi evidence for manual research triage",
@@ -207,6 +276,19 @@ def build_parser() -> argparse.ArgumentParser:
     rank.add_argument("--limit", type=int, default=10)
     rank.add_argument("--format", choices=("text", "json"), default="text")
     rank.set_defaults(handler=_rank_immunefi)
+
+    scout = commands.add_parser(
+        "scout", help="qualify a sourced paid-work candidate with the local Ollama model"
+    )
+    scout_commands = scout.add_subparsers(dest="scout_command", required=True)
+    qualify = scout_commands.add_parser(
+        "qualify", help="classify one candidate; no scraping, bidding, or customer contact"
+    )
+    qualify.add_argument("--input-file", required=True)
+    qualify.add_argument("--base-url", default=os.environ.get("OWNERA_OLLAMA_URL", "http://127.0.0.1:11434"))
+    qualify.add_argument("--model", default=os.environ.get("OWNERA_SCOUT_MODEL", "qwen2.5:0.5b"))
+    qualify.add_argument("--timeout", type=float, default=180)
+    qualify.set_defaults(handler=_qualify_paid_work)
 
     paid = commands.add_parser("paid-work", help="manage the manual-first paid-work pipeline")
     paid_commands = paid.add_subparsers(dest="paid_work_command", required=True)
