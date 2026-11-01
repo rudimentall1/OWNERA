@@ -25,10 +25,10 @@ class BidPolicy:
     max_amount: Decimal = Decimal("25")
     max_age_days: int = 30
     max_acceptance_window_days: int = 7
-    max_pending_bids: int = 2
+    max_pending_bids: int = 20
     max_active_assignments: int = 1
-    max_total_commitments: int = 1
-    max_submissions_per_run: int = 1
+    max_total_commitments: int = 20
+    max_submissions_per_run: int = 5
     allowed_capabilities: frozenset[str] = frozenset({
         "python", "javascript", "api_integration", "automation",
         "data_processing", "research", "security_review",
@@ -59,10 +59,10 @@ class BidPolicy:
             max_amount=dec("OWNERA_NEAR_BID_MAX_USDC", "25"),
             max_age_days=int(os.environ.get("OWNERA_NEAR_BID_MAX_AGE_DAYS", "30")),
             max_acceptance_window_days=int(os.environ.get("OWNERA_NEAR_BID_MAX_ACCEPTANCE_DAYS", "7")),
-            max_pending_bids=int(os.environ.get("OWNERA_NEAR_BID_MAX_PENDING", "2")),
+            max_pending_bids=int(os.environ.get("OWNERA_NEAR_BID_MAX_PENDING", "20")),
             max_active_assignments=int(os.environ.get("OWNERA_NEAR_BID_MAX_ACTIVE", "1")),
-            max_total_commitments=int(os.environ.get("OWNERA_NEAR_BID_MAX_TOTAL_COMMITMENTS", "1")),
-            max_submissions_per_run=int(os.environ.get("OWNERA_NEAR_BID_MAX_PER_RUN", "1")),
+            max_total_commitments=int(os.environ.get("OWNERA_NEAR_BID_MAX_TOTAL_COMMITMENTS", "20")),
+            max_submissions_per_run=int(os.environ.get("OWNERA_NEAR_BID_MAX_PER_RUN", "5")),
         )
 
     def __post_init__(self) -> None:
@@ -164,6 +164,21 @@ def generate_proposal(job: dict, amount: Decimal) -> str:
     title = str(job.get("title", "the requested task")).strip()
     description = str(job.get("description", "")).casefold()
     tags = {str(tag).casefold() for tag in job.get("tags", []) if isinstance(tag, str)}
+    title_key = title.casefold()
+    scoped = {
+        "completed jobs per day": "Define completed-job events and exclusions, build the marketplace funnel with formulas, growth accounting, a one-page dashboard and weekly leading indicators. First sources: NEAR Agent Market API/docs, Stripe platform docs, and published marketplace metrics from Airbnb, Etsy and Upwork.",
+        "distribution channels": "Compare listing requirements, review, adoption evidence, cost and eligibility across the official MCP Registry, Smithery, Glama, PulseMCP, mcp.so, Claude connectors, ChatGPT apps, A2A/x402 catalogs, GitHub, Hugging Face, npm and PyPI. Rank channels and give exact submission steps for the top five. First sources: official directory submission docs and OpenAI/Anthropic platform policies.",
+        "specialist": "Compare delegation and integration paths across OpenAI Agents SDK, Claude Agent SDK, LangGraph, CrewAI, AutoGen, Google ADK, Vercel AI SDK and n8n. Deliver a comparison and three concrete integration specs covering installation, tool schema, auth/payment and asynchronous results. First sources: each framework's official documentation.",
+        "outsource repeatedly": "Survey recurring outsourced task families and rank 15–20 by demand evidence, unit price, latency, output verifiability and fit for agent-to-agent delivery. Separate measured facts from estimates. First sources: official pricing pages for scraping, OCR, transcription, translation and model APIs, plus public GitHub, Reddit and framework-community discussions.",
+        "agent-to-agent commerce": "Compare x402, Virtuals ACP, Olas, Fetch.ai Agentverse, Google A2A and agent marketplaces by traded service, buyer type, verifiable volume, price, discovery, payment and fees. Mark self-reported metrics. First sources: Coinbase x402, Virtuals, Olas, Fetch.ai and Google A2A primary documentation, then public marketplace/API data.",
+        "sagekai": "Search the public NEAR Agent Market agent directory and public agent profiles for the exact name SageKai; verify a matching handle and profile URL, distinguish similar names, and report not found if there is no verifiable public match. First sources: the public Agent Market agent directory and agent-search API.",
+    }
+    for key, details in scoped.items():
+        if key in title_key:
+            proposal = f"Bid: {amount} USDC. {details} I will cite URLs actually opened, label estimates, and state evidence gaps rather than guess."
+            if len(proposal) > 4000:
+                raise NearMarketError("generated proposal exceeds marketplace limit")
+            return proposal
     research = "research" in tags or any(word in title.casefold() for word in ("research", "analysis", "economics", "benchmark"))
     if research:
         if "micro-job" in title.casefold() or "payment" in description or "judge" in description:
