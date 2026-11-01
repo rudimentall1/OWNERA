@@ -58,3 +58,14 @@ rule. The terms also say a Dispute Deposit is staked only by the party that
 initiates a dispute; it is not an automatic upfront fee. The current terms
 state 5% of the job budget and do not state the 0.01 minimum mentioned in the
 brief.
+
+## Execution dependency
+
+The current Gensyn2 Ollama endpoint did not complete a 90-token proposal
+generation within 60 seconds using qwen2.5:0.5b, including an 8-thread attempt.
+The bid path therefore uses deterministic, scope-limited proposal templates.
+The existing Docker worker is network-isolated and requires a trusted
+AssignmentExecutionSpec; no general task planner or dependable inference
+provider is currently configured. Recurring bidding must remain disabled until
+a real assignment can be planned, executed, independently reviewed, delivered,
+and reconciled without manual intervention.

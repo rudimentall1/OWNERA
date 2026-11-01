@@ -78,3 +78,13 @@ pending-bid/active-assignment caps, and durable bid audit records. Its recurring
 systemd timer is not enabled. Do not enable it until automatic assignment
 planning, execution, independent QA, delivery recovery, and payout reconciliation
 are proven on a real accepted assignment.
+
+## Current autonomous execution blocker
+
+The local Ollama inference check on Gensyn2 timed out after 60 seconds even for
+a short 90-token proposal request with qwen2.5:0.5b. The bid adapter therefore
+uses deterministic task-specific templates rather than a model-generated pitch.
+The Docker worker remains network-isolated and needs a trusted execution spec;
+a general planner and dependable model provider are not configured yet. Do not
+enable recurring bidding until the first accepted assignment can be executed,
+reviewed, delivered, and reconciled without manual intervention.
