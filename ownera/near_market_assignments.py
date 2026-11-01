@@ -69,9 +69,13 @@ def sync_assignments(database_path: str | Path, *, token: str | None = None, ass
         )""")
         now = datetime.now(timezone.utc).isoformat()
         for item in rows:
-            assignment_id = item.get("assignmentId")
-            job_id = item.get("jobId")
-            status = item.get("status")
+            # The documented worker endpoint returns {assignment, job, latestMessage}.
+            # Keep the complete source snapshot while normalizing index columns.
+            assignment = item.get("assignment") if isinstance(item.get("assignment"), dict) else item
+            job = item.get("job") if isinstance(item.get("job"), dict) else {}
+            assignment_id = assignment.get("assignmentId")
+            job_id = assignment.get("jobId") or job.get("jobId")
+            status = assignment.get("status")
             if not isinstance(assignment_id, str) or not assignment_id.strip() or not isinstance(job_id, str) or not job_id.strip() or not isinstance(status, str) or not status.strip():
                 ignored += 1
                 continue

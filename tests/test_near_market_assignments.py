@@ -22,3 +22,13 @@ def test_assignment_intake_ignores_incomplete_records(tmp_path):
     assert report.fetched == 3
     assert report.created == 0
     assert report.ignored == 3
+
+
+def test_assignment_intake_accepts_documented_nested_worker_payload(tmp_path):
+    item = {
+        "assignment": {"assignmentId": "hire-nested", "jobId": "job-nested", "status": "in_progress", "startedAt": None},
+        "job": {"jobId": "job-nested", "title": "Build API", "description": "Implement API"},
+        "latestMessage": None,
+    }
+    report = sync_assignments(tmp_path / "ownera.sqlite3", assignments=[item])
+    assert report.created == 1 and report.ignored == 0
