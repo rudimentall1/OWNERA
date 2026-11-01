@@ -86,6 +86,53 @@ def build_assignment_dossier(database_path, assignment_id: str) -> dict:
     if not source_pairs:
         raise ResearchDossierError("no verified captured source pairs are available")
 
+    # Mechanical discovery only: numeric-looking lines are candidates for a
+    # later analyst, never accepted as facts or interpreted as measurements.
+    numeric_pattern = re.compile(
+        r"(?<![\w])(?:[$€£]\s?\d[\d,.]*(?:\s?(?:k|m|b|million|billion))?|"
+        r"\d[\d,.]*\s?(?:%|percent|USDC|USD|EUR|GBP|ms|seconds?|minutes?|hours?|days?|jobs?|users?|agents?))(?![\w])",
+        re.IGNORECASE,
+    )
+    evidence_candidates = []
+    for index, (source, extracted, raw_digest, metadata_digest) in enumerate(source_pairs, start=1):
+        for line_number, line in enumerate(extracted.splitlines(), start=1):
+            matches = numeric_pattern.findall(line)
+            if matches:
+                evidence_candidates.append({
+                    "source_id": f"S{index}",
+                    "source_url": source["final_url"],
+                    "source_sha256": raw_digest,
+                    "line_number": line_number,
+                    "text": line[:1200],
+                    "numeric_tokens": matches[:20],
+                    "classification": "UNVERIFIED_CANDIDATE_NOT_A_FACT",
+                })
+                if len(evidence_candidates) >= 500:
+                    break
+        if len(evidence_candidates) >= 500:
+            break
+    evidence_index = {
+        "schema": "ownera.near-research-evidence-index.v1",
+        "assignment_id": assignment_id,
+        "plan_sha256": plan["plan_sha256"],
+        "candidate_count": len(evidence_candidates),
+        "semantic_review": "NOT_PERFORMED",
+        "candidates": evidence_candidates,
+        "limitations": [
+            "Numeric pattern matches are discovery hints, not verified facts.",
+            "Context, units, source authority, date, methodology, and possible marketing claims require analyst review.",
+            "No totals, averages, rankings, forecasts, or other calculations are inferred.",
+        ],
+    }
+    index_bytes = json.dumps(evidence_index, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
+    index_record = registry.put(
+        task_id=task_id,
+        worker_id="near-market-research-dossier",
+        artifact_name="EVIDENCE_INDEX.json",
+        content=index_bytes,
+        media_type="application/json",
+    )
+
     lines = [
         f"# Research evidence dossier: {plan['title']}",
         "",
@@ -133,7 +180,16 @@ def build_assignment_dossier(database_path, assignment_id: str) -> dict:
             "```",
             "",
         ])
-    lines.extend(["## Required analysis sections", ""])
+    lines.extend([
+        "## Candidate quantitative evidence",
+        "",
+        f"Mechanical scan found {len(evidence_candidates)} numeric-looking text fragments. These are unverified candidates, not facts.",
+        f"Machine-readable index: `EVIDENCE_INDEX.json` (SHA-256 `{index_record.sha256}`).",
+        "Review each candidate in context before using it. Do not combine figures across sources without checking definitions, dates, units, and methodology.",
+        "",
+        "## Required analysis sections",
+        "",
+    ])
     lines.extend(f"### {section}\n\nNOT YET ANALYSED. Cite evidence using [S1], [S2], etc.\n" for section in plan["deliverable_sections"])
     lines.extend(["## Acceptance criteria review", ""])
     lines.extend(f"- [ ] NOT ASSESSED: {criterion}" for criterion in plan["acceptance_criteria"])
@@ -172,6 +228,8 @@ def build_assignment_dossier(database_path, assignment_id: str) -> dict:
         "citation_ids": citation_ids,
         "artifact_sha256": record.sha256,
         "artifact_name": record.artifact_name,
+        "evidence_index_sha256": index_record.sha256,
+        "numeric_candidates": len(evidence_candidates),
         "execution_state": "EVIDENCE_DOSSIER_ONLY",
         "semantic_review": "NOT_PERFORMED",
         "acceptance_criteria": "NOT_ASSESSED",

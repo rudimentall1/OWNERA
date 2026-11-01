@@ -240,9 +240,9 @@ def build_assignment_plan(item: dict[str, Any]) -> dict[str, Any] | None:
         "brief_sha256": brief_digest,
         "execution_state": "PLAN_READY_NOT_EXECUTABLE",
         "execution_blockers": [
-            "No verified source-fetch and citation-capture worker is connected yet.",
-            "No independent semantic reviewer is connected yet.",
-            "This plan contains no executable command and does not start or submit the assignment.",
+            "Captured sources can be indexed, but semantic fact extraction and synthesis are not automated.",
+            "No independent semantic reviewer is connected; hashes prove integrity, not factual correctness.",
+            "This plan contains no executable worker command and does not start or submit the assignment.",
         ],
     }
     plan_body["plan_sha256"] = _canonical_digest(plan_body)

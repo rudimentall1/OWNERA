@@ -31,7 +31,7 @@ class Opener:
         url = request.full_url
         if url.endswith("/robots.txt"):
             return Response(b"User-agent: *\nAllow: /\n", url)
-        body = f"<html><head><title>Evidence {url}</title></head><body><main><p>Public evidence captured from {url}.</p></main></body></html>".encode()
+        body = f"<html><head><title>Evidence {url}</title></head><body><main><p>Public evidence captured from {url}. Observed sample price: $15 and 12% reported growth in 2025.</p></main></body></html>".encode()
         return Response(body, url)
 
 
@@ -62,6 +62,9 @@ def test_dossier_links_citations_to_verified_original_bytes(tmp_path, public_dns
     assert "[S1]" in text and "[S2]" in text
     assert "NOT YET PRODUCED" in text and "NOT ASSESSED" in text
     assert result["artifact_sha256"] == hashlib.sha256(text.encode()).hexdigest()
+    assert result["numeric_candidates"] >= 1
+    assert "UNVERIFIED_CANDIDATE_NOT_A_FACT" in registry.get(result["evidence_index_sha256"]).decode()
+    assert "Candidate quantitative evidence" in text
 
 
 def test_dossier_rejects_corrupted_source_metadata_or_raw_bytes(tmp_path, public_dns):
