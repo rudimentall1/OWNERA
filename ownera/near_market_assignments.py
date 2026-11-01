@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from ownera.near_market import API_BASE, NearMarketError
@@ -31,27 +32,47 @@ class AssignmentSyncReport:
         }
 
 
-def fetch_assignments(token: str | None = None) -> list[dict]:
+def fetch_assignments(token: str | None = None, *, opener=urlopen, page_size: int = 100, max_records: int = 10000) -> list[dict]:
+    """Fetch every assignment status with bounded pagination.
+
+    The default worker feed may omit completed assignments. `status=all` is
+    required for reliable award and delivery reconciliation. Pagination follows
+    the same documented query contract used by NearMarketLifecycle.
+    """
     credential = token or os.environ.get("NEAR_AGENT_MARKET_API_TOKEN", "")
     if not credential.strip():
         raise NearMarketError("NEAR_AGENT_MARKET_API_TOKEN is not configured")
-    request = Request(
-        f"{API_BASE}/v1/agents/me/assignments",
-        headers={"Authorization": f"Bearer {credential}", "Accept": "application/json", "User-Agent": "OWNERA-PaidWork/0.1"},
-    )
-    try:
-        with urlopen(request, timeout=25) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        detail = exc.read(1000).decode("utf-8", errors="replace")
-        raise NearMarketError(f"NEAR Agent Market returned HTTP {exc.code}: {detail}") from exc
-    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise NearMarketError(f"NEAR Agent Market request failed: {exc}") from exc
-    if not isinstance(payload, dict) or not isinstance(payload.get("assignments"), list):
-        raise NearMarketError("assignment response must contain an assignments list")
-    if any(not isinstance(item, dict) for item in payload["assignments"]):
-        raise NearMarketError("assignment response contains a non-object record")
-    return payload["assignments"]
+    if not 1 <= page_size <= 100 or not page_size <= max_records <= 10000:
+        raise ValueError("page_size must be 1..100 and max_records page_size..10000")
+
+    rows: list[dict] = []
+    offset = 0
+    while offset < max_records:
+        query = urlencode({"status": "all", "limit": page_size, "offset": offset})
+        request = Request(
+            f"{API_BASE}/v1/agents/me/assignments?{query}",
+            headers={"Authorization": f"Bearer {credential}", "Accept": "application/json", "User-Agent": "OWNERA-PaidWork/0.2"},
+        )
+        try:
+            with opener(request, timeout=25) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            detail = exc.read(1000).decode("utf-8", errors="replace")
+            raise NearMarketError(f"NEAR Agent Market returned HTTP {exc.code}: {detail}") from exc
+        except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+            raise NearMarketError(f"NEAR Agent Market request failed: {exc}") from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("assignments"), list):
+            raise NearMarketError("assignment response must contain an assignments list")
+        page = payload["assignments"]
+        if any(not isinstance(item, dict) for item in page):
+            raise NearMarketError("assignment response contains a non-object record")
+        rows.extend(page)
+        if len(page) < page_size:
+            break
+        offset += len(page)
+    if len(rows) >= max_records and len(rows) % page_size == 0:
+        raise NearMarketError(f"assignment feed exceeded the {max_records}-record safety limit")
+    return rows
 
 
 def sync_assignments(database_path: str | Path, *, token: str | None = None, assignments: list[dict] | None = None) -> AssignmentSyncReport:

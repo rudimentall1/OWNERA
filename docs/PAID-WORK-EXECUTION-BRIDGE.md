@@ -13,7 +13,7 @@
 
 ## Explicitly not implemented
 
-The module does not call the marketplace start or submit endpoints, does not approve work, and does not claim a payout. The authenticated assignment API currently returns zero assignments, and its live write contract has not been verified against an authoritative API specification. Do not infer endpoint paths or request bodies. Marketplace submission remains a separate adapter to add after contract verification.
+The dispatch module itself does not call marketplace start or submit endpoints. The separate `ownera.near_market_lifecycle` adapter implements the documented start, file-upload, assignment-status, and submit calls. Automatic trusted planning, dispatch orchestration, independent reviewer execution, and payout reconciliation are not yet connected to the assignment polling service. The authenticated all-statuses assignment feed returned zero assignments on 2026-11-01; no live start or submit has been performed.
 
 ## Verification
 
