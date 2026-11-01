@@ -46,7 +46,7 @@ class DiscoveredBounty:
     project: str
     slug: str
     source_url: str
-    max_bounty_usd: Decimal | None
+    max_bounty_ceiling: Decimal | None
     program_types: tuple[str, ...]
     project_types: tuple[str, ...]
     ecosystems: tuple[str, ...]
@@ -162,7 +162,7 @@ class ImmunefiPublicCatalogAdapter:
             "retrieved_at": fetched_at.isoformat(),
             "project": project,
             "slug": slug,
-            "max_bounty_usd_ceiling": record.get("maxBounty"),
+            "max_bounty_ceiling": record.get("maxBounty"),
             "rewards_token": self._bounded_text(record.get("rewardsToken"), 80),
             "program_types": record.get("programType") or [],
             "project_types": record.get("projectType") or [],
@@ -292,7 +292,7 @@ class ImmunefiPublicCatalogAdapter:
                     project=project,
                     slug=slug,
                     source_url=source_url,
-                    max_bounty_usd=(
+                    max_bounty_ceiling=(
                         Decimal(max_bounty) if max_bounty is not None else None
                     ),
                     program_types=program_types,
