@@ -59,8 +59,8 @@ class CommercialOpportunity:
             raise ValueError("source_url must be an absolute HTTP(S) URL")
         if self.budget_min < 0 or self.budget_max < self.budget_min:
             raise ValueError("invalid opportunity budget range")
-        if len(self.currency) != 3 or not self.currency.isalpha():
-            raise ValueError("currency must be a three-letter code")
+        if (len(self.currency) != 3 and self.currency != "USDC") or not self.currency.isalpha():
+            raise ValueError("currency must be a three-letter code or USDC")
         if not self.required_capabilities:
             raise ValueError("required_capabilities cannot be empty")
         if not self.evidence_refs or any(not item.strip() for item in self.evidence_refs):
