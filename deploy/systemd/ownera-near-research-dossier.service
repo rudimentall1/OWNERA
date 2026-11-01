@@ -1,0 +1,16 @@
+[Unit]
+Description=OWNERA NEAR research evidence dossier builder
+After=network-online.target ownera-near-research-collector.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/OWNERA
+ExecStart=/opt/OWNERA/.venv/bin/ownera paid-work build-near-research-dossiers --database /var/lib/ownera/ownera.sqlite3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/ownera

@@ -175,6 +175,11 @@ def _paid_work(args: argparse.Namespace) -> int:
         report = collect_active_assignment_sources(args.database, max_sources=args.max_sources)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1 if report["failures"] else 0
+    if args.paid_work_command == "build-near-research-dossiers":
+        from ownera.near_market_research_dossier import build_active_assignment_dossiers
+        report = build_active_assignment_dossiers(args.database)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1 if report["failures"] else 0
     if args.paid_work_command == "bid-near-market":
         report = run_bid_cycle(
             args.database,
@@ -337,6 +342,12 @@ def build_parser() -> argparse.ArgumentParser:
     research_collect.add_argument("--database", default=default_db)
     research_collect.add_argument("--max-sources", type=int, default=12)
     research_collect.set_defaults(handler=_paid_work)
+    research_dossier = paid_commands.add_parser(
+        "build-near-research-dossiers",
+        help="verify captured source bytes and build citation-linked evidence dossiers",
+    )
+    research_dossier.add_argument("--database", default=default_db)
+    research_dossier.set_defaults(handler=_paid_work)
     bidding = paid_commands.add_parser("bid-near-market", help="qualify public jobs and optionally submit bounded bids")
     bidding.add_argument("--database", default=default_db)
     bidding.add_argument("--submit", action="store_true", help="submit eligible bids; requires OWNERA_NEAR_BIDDING_ENABLED=true")

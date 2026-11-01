@@ -196,3 +196,21 @@ def test_fetch_public_source_respects_robots_disallow(public_dns):
     with pytest.raises(SourceCollectionError, match="robots.txt disallows"):
         fetch_public_source(url, approved_urls={url}, opener=opener)
     assert opener.calls == 1
+
+
+def test_repeated_collection_reuses_immutable_source_pairs(tmp_path, public_dns):
+    db_path = tmp_path / "ownera.sqlite3"
+    _active_assignment(db_path, "Find SageKai Agent")
+    url = "https://market.near.ai/agents"
+    body = b"<html><head><title>Agent directory</title></head><body><main><p>Stable captured source.</p></main></body></html>"
+    opener = FakeOpener(FakeResponse(body, url=url))
+    first = collect_assignment_sources(db_path, "research-collector-1", opener=opener)
+    request_count = len(opener.requests)
+    second = collect_assignment_sources(db_path, "research-collector-1", opener=opener)
+    assert second["sources_captured"] == first["sources_captured"] == 2
+    assert len(opener.requests) == request_count
+    from ownera.artifact_registry import SQLiteArtifactRegistry
+    records = SQLiteArtifactRegistry(db_path).list_for_task(first["artifact_task_id"])
+    assert len([item for item in records if item.artifact_name.endswith(".json")]) == 2
+    assert len([item for item in records if item.artifact_name.endswith(".raw")]) == 2
+    assert len([item for item in records if item.artifact_name == "SOURCE_COLLECTION.md"]) == 1

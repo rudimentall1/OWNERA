@@ -316,7 +316,37 @@ def collect_assignment_sources(database_path, assignment_id: str, *, opener=None
     captured: list[CapturedSource] = []
     failures: list[dict] = []
     robots_cache: dict[str, urllib.robotparser.RobotFileParser] = {}
+    existing_records: dict[str, list] = {}
+    for record in registry.list_for_task(task_id):
+        if record.worker_id == worker_id:
+            existing_records.setdefault(record.artifact_name, []).append(record)
     for index, url in enumerate(urls, start=1):
+        json_name = f"source-{index:02d}.json"
+        raw_name = f"source-{index:02d}.raw"
+        json_records = existing_records.get(json_name, [])
+        raw_records = existing_records.get(raw_name, [])
+        if json_records or raw_records:
+            if len(json_records) != 1 or len(raw_records) != 1:
+                failures.append({"url": url, "error": "Source artifact pair is incomplete; refusing to overwrite immutable evidence."})
+                continue
+            try:
+                metadata = json.loads(registry.get(json_records[0].sha256).decode("utf-8"))
+                source = metadata.get("source")
+                raw = registry.get(raw_records[0].sha256)
+                if (
+                    metadata.get("assignment_id") != assignment_id
+                    or metadata.get("plan_sha256") != plan["plan_sha256"]
+                    or not isinstance(source, dict)
+                    or source.get("requested_url") != url
+                    or source.get("sha256") != hashlib.sha256(raw).hexdigest()
+                    or source.get("byte_size") != len(raw)
+                ):
+                    raise SourceCollectionError("existing immutable source pair failed assignment, URL, or byte-integrity checks")
+                captured.append(CapturedSource(**source, raw_content=raw))
+                continue
+            except (KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError, ValueError, OSError) as exc:
+                failures.append({"url": url, "error": f"Existing source evidence is invalid: {type(exc).__name__}: {str(exc)[:180]}"})
+                continue
         try:
             item = fetch_public_source(
                 url, approved_urls=approved_urls, opener=opener, robots_cache=robots_cache
@@ -333,14 +363,14 @@ def collect_assignment_sources(database_path, assignment_id: str, *, opener=None
             registry.put(
                 task_id=task_id,
                 worker_id=worker_id,
-                artifact_name=f"source-{index:02d}.json",
+                artifact_name=json_name,
                 content=content,
                 media_type="application/json",
             )
             registry.put(
                 task_id=task_id,
                 worker_id=worker_id,
-                artifact_name=f"source-{index:02d}.raw",
+                artifact_name=raw_name,
                 content=item.raw_content,
                 media_type=item.content_type.split(";", 1)[0] or "application/octet-stream",
             )
@@ -353,7 +383,7 @@ def collect_assignment_sources(database_path, assignment_id: str, *, opener=None
         "",
         f"- Assignment: {assignment_id}",
         f"- Plan SHA-256: {plan['plan_sha256']}",
-        f"- Captured at: {datetime.now(timezone.utc).isoformat()}",
+        f"- Captured through: {max(item.fetched_at for item in captured) if captured else 'none'}",
         f"- Sources successfully captured: {len(captured)} / {len(urls)}",
         "",
         "> This is a source packet, not a completed research report. No synthesis,",
