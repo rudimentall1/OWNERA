@@ -8,7 +8,6 @@ never submits reports or authorizes testing.
 from __future__ import annotations
 
 import json
-import typing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -23,18 +22,6 @@ IMMUNEFI_CATALOG_URL = "https://immunefi.com/public-api/bounties.json"
 
 class SourceAdapterError(RuntimeError):
     """A public source could not be safely fetched or parsed."""
-
-
-class EvidenceCapturePort(typing.Protocol):
-    def capture(
-        self,
-        *,
-        opportunity_id: UUID,
-        source_name: str,
-        source_url: str,
-        content_snapshot: str,
-    ):
-        ...
 
 
 @dataclass(frozen=True)
@@ -67,8 +54,11 @@ class ImmunefiPublicCatalogAdapter:
     TIMEOUT_SECONDS = 20
     SOURCE_NAME = "Immunefi public bounty catalog"
 
-    def __init__(self, evidence_registry: EvidenceCapturePort) -> None:
-        self._evidence_registry = evidence_registry
+    def __init__(self, evidence_registry: object) -> None:
+        capture = getattr(evidence_registry, "capture", None)
+        if not callable(capture):
+            raise TypeError("evidence_registry must provide a callable capture method")
+        self._capture_evidence = capture
 
     def fetch_payload(self) -> bytes:
         request = Request(
@@ -289,7 +279,7 @@ class ImmunefiPublicCatalogAdapter:
             snapshot = self._snapshot(
                 record, fetched_at=fetched_at, slug=slug, project=project
             )
-            evidence = self._evidence_registry.capture(
+            evidence = self._capture_evidence(
                 opportunity_id=opportunity_id,
                 source_name=self.SOURCE_NAME,
                 source_url=source_url,
