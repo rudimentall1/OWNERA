@@ -9,11 +9,12 @@
 The registry turns an opportunity's source material into a durable reviewable record:
 
 1. Capture a public HTTPS source URL and bounded content snapshot.
-2. Calculate and store a SHA-256 digest of the exact snapshot.
-3. Create an immutable-in-normal-use evidence record in `PENDING`.
-4. Require an authenticated principal with `owner:commercial` to accept or reject it.
-5. Record reviewer identity from the verified principal, never from request input.
-6. Verify the content digest and per-evidence hash-chained audit events.
+2. Generate the evidence ID and capture timestamp inside the registry, not from caller input.
+3. Calculate and store a SHA-256 digest of the exact snapshot.
+4. Create an immutable-in-normal-use evidence record in `PENDING`.
+5. Require an authenticated principal with `owner:commercial` to accept or reject it.
+6. Record reviewer identity from the verified principal, never from request input.
+7. Verify the content digest and per-evidence hash-chained audit events.
 
 ## Trust boundaries
 
