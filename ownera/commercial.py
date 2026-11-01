@@ -202,7 +202,7 @@ class CommercialEngine:
                     opportunity.evidence_refs,
                     expected_source_url=opportunity.source_url,
                 )
-            except RuntimeError:
+            except (PermissionError, RuntimeError):
                 reasons.append("evidence_not_owner_accepted")
 
         if opportunity.deadline is not None and opportunity.deadline <= current_time:
