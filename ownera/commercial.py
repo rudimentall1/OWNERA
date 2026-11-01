@@ -11,8 +11,8 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
-from urllib.parse import urlparse
 from typing import Protocol
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 
@@ -202,7 +202,7 @@ class CommercialEngine:
                     opportunity.evidence_refs,
                     expected_source_url=opportunity.source_url,
                 )
-            except Exception:
+            except RuntimeError:
                 reasons.append("evidence_not_owner_accepted")
 
         if opportunity.deadline is not None and opportunity.deadline <= current_time:
