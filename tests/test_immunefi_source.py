@@ -73,7 +73,7 @@ def test_ingest_captures_only_active_public_programs_as_pending_evidence():
     candidate = candidates[0]
     assert candidate.project == "Example Protocol"
     assert candidate.source_url == "https://immunefi.com/bug-bounty/example-protocol/"
-    assert candidate.max_bounty_usd == 250000
+    assert candidate.max_bounty_ceiling == 250000
     assert candidate.kyc_required is False
     assert candidate.assets_count == 1
     assert candidate.captured_at == now
@@ -84,7 +84,7 @@ def test_ingest_captures_only_active_public_programs_as_pending_evidence():
     assert evidence["source_name"] == "Immunefi public bounty catalog"
     snapshot = json.loads(evidence["content_snapshot"])
     assert snapshot["source"] == IMMUNEFI_CATALOG_URL
-    assert snapshot["max_bounty_usd_ceiling"] == 250000
+    assert snapshot["max_bounty_ceiling"] == 250000
 
 
 def test_maximum_bounty_is_explicitly_a_ceiling_not_a_budget_floor():
