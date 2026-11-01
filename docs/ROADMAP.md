@@ -34,7 +34,8 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 ## 2 — Resource Discovery (read-only)
 
 - [ ] Define canonical resource-opportunity schema and provenance
-- [ ] Add approved public sources for grants, bounties, paid work, cloud credits, and compute
+- [x] Add first read-only Immunefi public bounty catalog adapter with PENDING evidence capture
+- [ ] Add further approved public sources for grants, paid work, cloud credits, and compute
 - [ ] Normalize, deduplicate, rank, and expire opportunities
 - [ ] Check eligibility, ownership, terms, and required permissions
 - [ ] Produce an evidence-backed opportunity report
@@ -94,7 +95,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add authenticated owner evidence review with reviewer identity binding and per-evidence hash-chained audit
 - [x] Add fail-closed evidence reference validation for accepted evidence belonging to the opportunity
 - [x] Enforce accepted evidence as a mandatory gate inside persistent commercial qualification
-- [ ] Add permitted source adapters and discover real paid work
+- [x] Add first read-only Immunefi catalog adapter (candidate intake only; no automatic qualification)
+- [ ] Run live source intake, review real candidate listings, and validate access/retention constraints
+- [ ] Add source deduplication and change tracking
 - [ ] Owner-approved contracts and customer commitments
 - [ ] Deliver work and independent quality review
 - [x] Add owner-attested partial receipt ledger with accepted-amount caps, idempotency, and atomic event persistence
