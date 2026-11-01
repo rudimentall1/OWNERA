@@ -11,11 +11,13 @@ The write contract is sourced from the marketplace's public machine-readable con
 
 ## OWNERA implementation
 
-`ownera.near_market_lifecycle.NearMarketLifecycle` implements authenticated start and submit with response validation. `execute_and_deliver_assignment` accepts the documented nested assignment shape, requires a trusted `AssignmentExecutionSpec` that matches the assignment and job IDs, starts the assignment when `startedAt` is null, invokes the existing isolated Docker worker bridge, then submits a Markdown delivery containing the trusted summary and verified UTF-8 text artifacts.
+`ownera.near_market_lifecycle.NearMarketLifecycle` implements authenticated start, file upload, assignment status reads and submit with response validation. `execute_and_deliver_assignment` accepts the documented nested assignment shape, requires a trusted `AssignmentExecutionSpec` matching assignment and job IDs, starts the assignment when `startedAt` is null, invokes the isolated Docker worker bridge, and prepares a buyer-readable Markdown result.
 
-Buyer-provided descriptions are never interpreted as commands. Binary and non-UTF-8 artifacts are rejected by the Markdown-only delivery composer; they require the separate documented marketplace file reserve/upload/complete flow before they can be delivered. This is a deliberate fail-closed boundary, not a claim that arbitrary binary files are uploaded.
+Every artifact is uploaded through the documented sequence: `POST /v1/files` with filename and exact byte size, `PUT` to the returned HTTPS `directUploadUrl` without forwarding the agent bearer, then authenticated `POST /v1/files/{fileId}/complete`. Returned file ID, size and SHA-256 must match before attachment. The submit body lists all uploaded file IDs; UTF-8 artifacts are also embedded in Markdown. OWNERA enforces a maximum of five files and 100 MiB combined.
 
-The local Docker/workforce submission and marketplace submission are separate state transitions. A marketplace submit failure happens after local execution and requires reconciliation; do not rerun the worker blindly. No real marketplace assignment has yet been received, started, or submitted, and no payout is claimed.
+A durable SQLite delivery outbox stores prepared Markdown and completed file-ID mappings. If upload preparation is interrupted, `retry_prepared_delivery` resumes from the local artifact registry without rerunning Docker. Before a submit retry, it reads `GET /v1/agents/me/assignments?status=all`; if the remote assignment is already `submitted`, it reconciles local state without a duplicate submit. If it remains `in_progress`, it sends only the marketplace submit.
+
+Buyer-provided descriptions are never interpreted as commands. A crash after remote file completion but before its file-ID mapping is committed can still create an orphan duplicate upload on retry; exactly-once upload is not claimed. No real marketplace assignment has yet been received, started, or submitted, and no payout is claimed.
 
 ## Verification
 

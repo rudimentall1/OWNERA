@@ -183,15 +183,33 @@ def test_delivery_reconciliation_detects_remote_success_without_duplicate_submit
     assert state == "SUBMITTED"
 
 
-def test_delivery_reconciliation_requires_ready_state(tmp_path):
+def test_delivery_reconciliation_resumes_partial_uploads_without_worker(tmp_path):
+    import hashlib
     import sqlite3
 
+    from ownera.artifact_registry import SQLiteArtifactRegistry
     from ownera.near_market_lifecycle import _init_delivery_outbox, retry_prepared_delivery
 
     db_path = tmp_path / "ownera.sqlite3"
+    registry = SQLiteArtifactRegistry(db_path)
+    content = b"recovered artifact"
+    registry.put(task_id="task-2", worker_id="worker-2", artifact_name="result.txt", content=content, media_type="text/plain")
     _init_delivery_outbox(db_path)
     with sqlite3.connect(db_path) as db:
         db.execute("INSERT INTO near_market_delivery_outbox(assignment_id,task_id,markdown,state,updated_at) VALUES('assignment-partial','task-2','# Delivery','PREPARING','now')")
-    api = NearMarketLifecycle("aat_test", opener=lambda *a, **k: pytest.fail("must not call remote API"))
-    with pytest.raises(NearMarketError, match="not fully prepared"):
-        retry_prepared_delivery("assignment-partial", database_path=db_path, lifecycle=api)
+    responses = [
+        {"fileId": "file-recovered", "directUploadUrl": "https://objects.example/recover"},
+        {"fileId": "file-recovered", "filename": "result.txt", "byteSize": len(content), "sha256": hashlib.sha256(content).hexdigest(), "contentType": "text/plain"},
+        {"assignments": [{"assignment": {"assignmentId": "assignment-partial", "status": "in_progress"}, "job": {}}]},
+        {"assignmentId": "assignment-partial", "status": "submitted"},
+    ]
+    def opener(request, timeout):
+        if request.full_url == "https://objects.example/recover":
+            assert request.get_method() == "PUT" and request.data == content
+            return FakeResponse({})
+        return FakeResponse(responses.pop(0))
+    result = retry_prepared_delivery("assignment-partial", database_path=db_path, lifecycle=NearMarketLifecycle("aat_test", opener=opener))
+    assert result.status == "submitted"
+    with sqlite3.connect(db_path) as db:
+        state = db.execute("SELECT state FROM near_market_delivery_outbox WHERE assignment_id='assignment-partial'").fetchone()[0]
+    assert state == "SUBMITTED"

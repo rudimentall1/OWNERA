@@ -240,14 +240,35 @@ def retry_prepared_delivery(assignment_id: str, *, database_path, lifecycle: Nea
     import sqlite3
     _init_delivery_outbox(database_path)
     with sqlite3.connect(str(database_path), timeout=10) as db:
-        row = db.execute("SELECT markdown,state FROM near_market_delivery_outbox WHERE assignment_id=?", (assignment_id,)).fetchone()
+        row = db.execute("SELECT task_id,markdown,state FROM near_market_delivery_outbox WHERE assignment_id=?", (assignment_id,)).fetchone()
     if row is None:
         raise NearMarketError("no prepared delivery exists for this assignment")
-    markdown, state = row
+    task_id, markdown, state = row
     if state == "SUBMITTED":
         return MarketplaceSubmission(assignment_id, "submitted", None, None)
+    if state == "PREPARING":
+        from ownera.artifact_registry import SQLiteArtifactRegistry
+        registry = SQLiteArtifactRegistry(database_path)
+        records = registry.list_for_task(task_id)
+        if len(records) > MAX_MARKETPLACE_FILES:
+            raise NearMarketError("assignment produced more than five files; consolidate artifacts before delivery")
+        if sum(record.size_bytes for record in records) > MAX_MARKETPLACE_FILE_BYTES:
+            raise NearMarketError("combined artifacts exceed marketplace 100 MiB delivery limit")
+        uploaded = _existing_uploads(database_path, assignment_id)
+        for record in records:
+            if record.sha256 in uploaded:
+                continue
+            content = registry.get(record.sha256)
+            file_id = lifecycle.upload_file(record.artifact_name, content, content_type=record.media_type)
+            _record_uploaded_file(database_path, assignment_id, record.sha256, file_id)
+            uploaded[record.sha256] = file_id
+        import sqlite3
+        from datetime import datetime, timezone
+        with sqlite3.connect(str(database_path), timeout=10) as db:
+            db.execute("UPDATE near_market_delivery_outbox SET state='READY_TO_SUBMIT',updated_at=? WHERE assignment_id=?", (datetime.now(timezone.utc).isoformat(), assignment_id))
+        state = "READY_TO_SUBMIT"
     if state != "READY_TO_SUBMIT":
-        raise NearMarketError("delivery is not fully prepared; finish or reconcile artifact uploads first")
+        raise NearMarketError("delivery is not ready to submit")
     # Resolve ambiguous timeouts by reading authoritative state before retrying.
     remote_state = lifecycle.get_assignment_status(assignment_id)
     if remote_state == "submitted":
@@ -311,16 +332,5 @@ def execute_and_deliver_assignment(
         spec.summary, tuple(record for record in records if _is_text_artifact(record, registry)), registry
     )
     _persist_delivery(database_path, assignment_id, spec.request.task_id, markdown)
-    uploaded = _existing_uploads(database_path, assignment_id)
-    for record in records:
-        if record.sha256 in uploaded:
-            continue
-        content = registry.get(record.sha256)
-        file_id = lifecycle.upload_file(record.artifact_name, content, content_type=record.media_type)
-        _record_uploaded_file(database_path, assignment_id, record.sha256, file_id)
-    import sqlite3
-    from datetime import datetime, timezone
-    with sqlite3.connect(str(database_path), timeout=10) as db:
-        db.execute("UPDATE near_market_delivery_outbox SET state='READY_TO_SUBMIT',updated_at=? WHERE assignment_id=?", (datetime.now(timezone.utc).isoformat(), assignment_id))
     remote_submission = retry_prepared_delivery(assignment_id, database_path=database_path, lifecycle=lifecycle)
     return local_submission, remote_submission
