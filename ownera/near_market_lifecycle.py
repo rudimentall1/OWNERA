@@ -5,16 +5,21 @@ https://market.near.ai/skill/flows/worker-lifecycle.md
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import mimetypes
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from ownera.near_market import API_BASE, NearMarketError
 
 MAX_DELIVERABLE_BYTES = 256 * 1024
+MAX_MARKETPLACE_FILE_BYTES = 100 * 1024 * 1024
+MAX_MARKETPLACE_FILES = 5
 
 
 @dataclass(frozen=True)
@@ -35,7 +40,7 @@ class NearMarketLifecycle:
         self.opener = opener
         self.timeout = timeout
 
-    def _request(self, path: str, *, body: dict | None = None) -> dict:
+    def _request(self, path: str, *, body: dict | None = None, method: str = "POST") -> dict:
         data = None if body is None else json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.token}",
@@ -44,7 +49,7 @@ class NearMarketLifecycle:
         }
         if data is not None:
             headers["Content-Type"] = "application/json"
-        request = Request(API_BASE + path, data=data, headers=headers, method="POST")
+        request = Request(API_BASE + path, data=data, headers=headers, method=method)
         try:
             with self.opener(request, timeout=self.timeout) as response:
                 raw = response.read()
@@ -58,6 +63,30 @@ class NearMarketLifecycle:
             raise NearMarketError("NEAR Agent Market returned a non-object response")
         return payload
 
+    def get_assignment_status(self, assignment_id: str) -> str:
+        """Read the assignment from the authenticated all-statuses worker feed."""
+        if not assignment_id or "/" in assignment_id:
+            raise ValueError("assignment_id must be a non-empty path-safe id")
+        from urllib.parse import urlencode
+        offset = 0
+        while offset < 10000:
+            query = urlencode({"status": "all", "limit": 100, "offset": offset})
+            payload = self._request(f"/v1/agents/me/assignments?{query}", method="GET")
+            rows = payload.get("assignments")
+            if not isinstance(rows, list):
+                raise NearMarketError("assignment status response is missing assignments")
+            for item in rows:
+                assignment = item.get("assignment") if isinstance(item, dict) else None
+                if isinstance(assignment, dict) and assignment.get("assignmentId") == assignment_id:
+                    status = assignment.get("status")
+                    if isinstance(status, str) and status:
+                        return status
+                    raise NearMarketError("assignment status response has no status")
+            if len(rows) < 100:
+                break
+            offset += len(rows)
+        raise NearMarketError("assignment was not found in the authenticated assignment feed")
+
     def start_assignment(self, assignment_id: str) -> str:
         if not assignment_id or "/" in assignment_id:
             raise ValueError("assignment_id must be a non-empty path-safe id")
@@ -66,6 +95,34 @@ class NearMarketLifecycle:
         if not isinstance(started_at, str) or not started_at:
             raise NearMarketError("start response is missing startedAt")
         return started_at
+
+    def upload_file(self, filename: str, content: bytes, *, content_type: str | None = None) -> str:
+        """Reserve, PUT and complete one marketplace-owned file; return its fileId."""
+        if not isinstance(filename, str) or not filename or len(filename) > 255 or any(ord(c) < 32 for c in filename) or "/" in filename or "\\" in filename:
+            raise ValueError("filename must be a plain filename of at most 255 characters")
+        if not isinstance(content, bytes) or not 1 <= len(content) <= MAX_MARKETPLACE_FILE_BYTES:
+            raise ValueError("file content must be between 1 byte and 100 MiB")
+        mime = content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        reserved = self._request("/v1/files", body={"filename": filename, "byteSize": len(content)})
+        file_id = reserved.get("fileId")
+        direct_url = reserved.get("directUploadUrl")
+        if not isinstance(file_id, str) or not file_id or not isinstance(direct_url, str):
+            raise NearMarketError("file reservation response is missing fileId or directUploadUrl")
+        parsed = urlparse(direct_url)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise NearMarketError("marketplace returned an unsafe direct upload URL")
+        upload_request = Request(direct_url, data=content, headers={"Content-Type": mime}, method="PUT")
+        try:
+            with self.opener(upload_request, timeout=self.timeout) as response:
+                response.read(1024)
+        except (HTTPError, URLError, TimeoutError) as exc:
+            # Do not print the presigned URL: it is a temporary bearer capability.
+            raise NearMarketError(f"marketplace object upload failed: {type(exc).__name__}") from exc
+        completed = self._request(f"/v1/files/{file_id}/complete")
+        expected_hash = hashlib.sha256(content).hexdigest()
+        if completed.get("fileId") != file_id or completed.get("byteSize") != len(content) or completed.get("sha256") != expected_hash:
+            raise NearMarketError("completed marketplace file metadata does not match uploaded bytes")
+        return file_id
 
     def submit_deliverable(self, assignment_id: str, markdown: str, *, files: tuple[str, ...] = ()) -> MarketplaceSubmission:
         if not assignment_id or "/" in assignment_id:
@@ -89,6 +146,17 @@ class NearMarketLifecycle:
             submitted_at=payload.get("submittedAt"),
             deliverable_hash=payload.get("deliverableHash"),
         )
+
+
+def _is_text_artifact(record, registry) -> bool:
+    content = registry.get(record.sha256)
+    if b"\x00" in content:
+        return False
+    try:
+        content.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
 
 
 def _compose_text_deliverable(summary: str, records, registry) -> str:
@@ -117,6 +185,87 @@ def _compose_text_deliverable(summary: str, records, registry) -> str:
     if len(markdown.encode("utf-8")) > MAX_DELIVERABLE_BYTES:
         raise NearMarketError("text artifacts exceed marketplace Markdown limit; use marketplace file upload")
     return markdown
+
+
+def _init_delivery_outbox(database_path) -> None:
+    import sqlite3
+    with sqlite3.connect(str(database_path), timeout=10) as db:
+        db.execute("""CREATE TABLE IF NOT EXISTS near_market_delivery_outbox (
+            assignment_id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL,
+            markdown TEXT NOT NULL,
+            state TEXT NOT NULL CHECK(state IN ('PREPARING','READY_TO_SUBMIT','SUBMITTED')),
+            file_ids_json TEXT NOT NULL DEFAULT '[]',
+            last_error TEXT,
+            updated_at TEXT NOT NULL
+        )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS near_market_delivery_files (
+            assignment_id TEXT NOT NULL,
+            artifact_sha256 TEXT NOT NULL,
+            file_id TEXT NOT NULL,
+            PRIMARY KEY(assignment_id, artifact_sha256),
+            UNIQUE(assignment_id, file_id)
+        )""")
+
+
+def _persist_delivery(database_path, assignment_id: str, task_id: str, markdown: str) -> None:
+    import sqlite3
+    from datetime import datetime, timezone
+    _init_delivery_outbox(database_path)
+    with sqlite3.connect(str(database_path), timeout=10) as db:
+        existing = db.execute("SELECT task_id, markdown FROM near_market_delivery_outbox WHERE assignment_id=?", (assignment_id,)).fetchone()
+        if existing and existing != (task_id, markdown):
+            raise NearMarketError("a different delivery is already prepared for this assignment")
+        db.execute("INSERT OR IGNORE INTO near_market_delivery_outbox(assignment_id,task_id,markdown,state,updated_at) VALUES(?,?,?,'PREPARING',?)", (assignment_id, task_id, markdown, datetime.now(timezone.utc).isoformat()))
+
+
+def _record_uploaded_file(database_path, assignment_id: str, digest: str, file_id: str) -> None:
+    import sqlite3
+    with sqlite3.connect(str(database_path), timeout=10) as db:
+        db.execute("INSERT OR IGNORE INTO near_market_delivery_files(assignment_id,artifact_sha256,file_id) VALUES(?,?,?)", (assignment_id, digest, file_id))
+        row = db.execute("SELECT file_id FROM near_market_delivery_files WHERE assignment_id=? AND artifact_sha256=?", (assignment_id, digest)).fetchone()
+        if not row or row[0] != file_id:
+            raise NearMarketError("artifact upload mapping conflicts with existing delivery state")
+
+
+def _existing_uploads(database_path, assignment_id: str) -> dict[str, str]:
+    import sqlite3
+    with sqlite3.connect(str(database_path), timeout=10) as db:
+        rows = db.execute("SELECT artifact_sha256,file_id FROM near_market_delivery_files WHERE assignment_id=?", (assignment_id,)).fetchall()
+    return dict(rows)
+
+
+def retry_prepared_delivery(assignment_id: str, *, database_path, lifecycle: NearMarketLifecycle) -> MarketplaceSubmission:
+    """Retry only marketplace delivery; never reruns the worker."""
+    import sqlite3
+    _init_delivery_outbox(database_path)
+    with sqlite3.connect(str(database_path), timeout=10) as db:
+        row = db.execute("SELECT markdown,state FROM near_market_delivery_outbox WHERE assignment_id=?", (assignment_id,)).fetchone()
+    if row is None:
+        raise NearMarketError("no prepared delivery exists for this assignment")
+    markdown, state = row
+    if state == "SUBMITTED":
+        return MarketplaceSubmission(assignment_id, "submitted", None, None)
+    if state != "READY_TO_SUBMIT":
+        raise NearMarketError("delivery is not fully prepared; finish or reconcile artifact uploads first")
+    # Resolve ambiguous timeouts by reading authoritative state before retrying.
+    remote_state = lifecycle.get_assignment_status(assignment_id)
+    if remote_state == "submitted":
+        _mark_delivery_submitted(database_path, assignment_id)
+        return MarketplaceSubmission(assignment_id, "submitted", None, None)
+    if remote_state != "in_progress":
+        raise NearMarketError(f"assignment cannot accept delivery in remote state {remote_state}")
+    files = tuple(file_id for _, file_id in sorted(_existing_uploads(database_path, assignment_id).items()))
+    result = lifecycle.submit_deliverable(assignment_id, markdown, files=files)
+    _mark_delivery_submitted(database_path, assignment_id)
+    return result
+
+
+def _mark_delivery_submitted(database_path, assignment_id: str) -> None:
+    import sqlite3
+    from datetime import datetime, timezone
+    with sqlite3.connect(str(database_path), timeout=10) as db:
+        db.execute("UPDATE near_market_delivery_outbox SET state='SUBMITTED',last_error=NULL,updated_at=? WHERE assignment_id=?", (datetime.now(timezone.utc).isoformat(), assignment_id))
 
 
 def execute_and_deliver_assignment(
@@ -155,8 +304,23 @@ def execute_and_deliver_assignment(
         spec, database_path=database_path, worker=worker, runtime=runtime
     )
     registry = SQLiteArtifactRegistry(database_path)
+    records = local_submission.artifact_records
+    if len(records) > MAX_MARKETPLACE_FILES:
+        raise NearMarketError("assignment produced more than five files; consolidate artifacts before delivery")
     markdown = _compose_text_deliverable(
-        spec.summary, local_submission.artifact_records, registry
+        spec.summary, tuple(record for record in records if _is_text_artifact(record, registry)), registry
     )
-    remote_submission = lifecycle.submit_deliverable(assignment_id, markdown)
+    _persist_delivery(database_path, assignment_id, spec.request.task_id, markdown)
+    uploaded = _existing_uploads(database_path, assignment_id)
+    for record in records:
+        if record.sha256 in uploaded:
+            continue
+        content = registry.get(record.sha256)
+        file_id = lifecycle.upload_file(record.artifact_name, content, content_type=record.media_type)
+        _record_uploaded_file(database_path, assignment_id, record.sha256, file_id)
+    import sqlite3
+    from datetime import datetime, timezone
+    with sqlite3.connect(str(database_path), timeout=10) as db:
+        db.execute("UPDATE near_market_delivery_outbox SET state='READY_TO_SUBMIT',updated_at=? WHERE assignment_id=?", (datetime.now(timezone.utc).isoformat(), assignment_id))
+    remote_submission = retry_prepared_delivery(assignment_id, database_path=database_path, lifecycle=lifecycle)
     return local_submission, remote_submission
