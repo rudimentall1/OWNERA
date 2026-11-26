@@ -1,0 +1,17 @@
+[Unit]
+Description=OWNERA policy-bounded NEAR Agent Market bidding
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/OWNERA
+EnvironmentFile=/etc/ownera/near-agent-market.env
+ExecStart=/bin/bash -lc 'if [ "$OWNERA_NEAR_BIDDING_ENABLED" = true ]; then exec /opt/OWNERA/.venv/bin/ownera paid-work bid-near-market --submit --database /var/lib/ownera/ownera.sqlite3; else exit 0; fi'
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/ownera

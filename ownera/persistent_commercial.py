@@ -10,6 +10,7 @@ from uuid import UUID
 from ownera.commercial import (
     CommercialAssessment,
     CommercialEngine,
+    CommercialEvidenceGate,
     CommercialOpportunity,
     ProposalDraft,
     QualificationResult,
@@ -20,10 +21,16 @@ from ownera.commercial_repository import SQLiteCommercialRepository
 class PersistentCommercialEngine:
     """Persists each successful commercial transition as a versioned snapshot."""
 
-    def __init__(self, database_path: str) -> None:
+    def __init__(
+        self,
+        database_path: str,
+        evidence_gate: CommercialEvidenceGate | None = None,
+    ) -> None:
         self.repository = SQLiteCommercialRepository(database_path)
+        self._evidence_gate = evidence_gate
         snapshot = self.repository.load()
         self._engine = snapshot.engine if snapshot else CommercialEngine()
+        self._engine.set_evidence_gate(self._evidence_gate)
         self._version = snapshot.version if snapshot else 0
         self.repository.event_store.verify("commercial_pipeline", "primary")
         self._event_version = len(
@@ -45,6 +52,7 @@ class PersistentCommercialEngine:
     def refresh(self) -> None:
         snapshot = self.repository.load()
         self._engine = snapshot.engine if snapshot else CommercialEngine()
+        self._engine.set_evidence_gate(self._evidence_gate)
         self._version = snapshot.version if snapshot else 0
         self._event_version = len(
             self.repository.event_store.load("commercial_pipeline", "primary")
@@ -93,20 +101,35 @@ class PersistentCommercialEngine:
     def assess(
         self, assessment: CommercialAssessment, *, now: datetime | None = None
     ) -> QualificationResult:
+        payload = {
+            "opportunity_id": str(assessment.opportunity_id),
+            "estimated_delivery_cost": str(assessment.estimated_delivery_cost),
+            "platform_fee_rate": str(assessment.platform_fee_rate),
+            "contingency_rate": str(assessment.contingency_rate),
+            "win_probability": str(assessment.win_probability),
+            "minimum_net_margin": str(assessment.minimum_net_margin),
+            "terms_reviewed": assessment.terms_reviewed,
+            "eligibility_confirmed": assessment.eligibility_confirmed,
+        }
+
+        def assess_and_record_outcome() -> QualificationResult:
+            result = self._engine.assess(assessment, now=now)
+            payload["qualification_result"] = {
+                "status": result.status.value,
+                "reasons": list(result.reasons),
+                "conservative_revenue": str(result.conservative_revenue),
+                "estimated_total_cost": str(result.estimated_total_cost),
+                "expected_net_profit": str(result.expected_net_profit),
+                "expected_net_margin": str(result.expected_net_margin),
+                "risk_adjusted_value": str(result.risk_adjusted_value),
+            }
+            return result
+
         return self._execute(
-            lambda: self._engine.assess(assessment, now=now),
+            assess_and_record_outcome,
             event_type="OpportunityAssessed",
             aggregate_id="primary",
-            payload={
-                "opportunity_id": str(assessment.opportunity_id),
-                "estimated_delivery_cost": str(assessment.estimated_delivery_cost),
-                "platform_fee_rate": str(assessment.platform_fee_rate),
-                "contingency_rate": str(assessment.contingency_rate),
-                "win_probability": str(assessment.win_probability),
-                "minimum_net_margin": str(assessment.minimum_net_margin),
-                "terms_reviewed": assessment.terms_reviewed,
-                "eligibility_confirmed": assessment.eligibility_confirmed,
-            },
+            payload=payload,
         )
 
     def draft_proposal(self, proposal: ProposalDraft) -> ProposalDraft:

@@ -1,0 +1,18 @@
+[Unit]
+Description=OWNERA resume prepared NEAR Agent Market deliveries
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/OWNERA
+EnvironmentFile=/etc/ownera/near-agent-market.env
+Environment=OWNERA_DB_PATH=/var/lib/ownera/ownera.sqlite3
+ExecStart=/opt/OWNERA/.venv/bin/ownera paid-work retry-near-deliveries --database /var/lib/ownera/ownera.sqlite3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/ownera

@@ -1,0 +1,16 @@
+[Unit]
+Description=OWNERA bounded public-source collector for NEAR research assignments
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/OWNERA
+ExecStart=/opt/OWNERA/.venv/bin/ownera paid-work collect-near-research --database /var/lib/ownera/ownera.sqlite3 --max-sources 12
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/ownera

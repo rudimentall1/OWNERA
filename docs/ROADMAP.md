@@ -34,8 +34,14 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 ## 2 — Resource Discovery (read-only)
 
 - [ ] Define canonical resource-opportunity schema and provenance
-- [ ] Add approved public sources for grants, bounties, paid work, cloud credits, and compute
-- [ ] Normalize, deduplicate, rank, and expire opportunities
+- [x] Add first read-only Immunefi public bounty catalog adapter with PENDING evidence capture
+- [ ] Add further approved public sources for grants, paid work, cloud credits, and compute
+- [x] Normalize and deduplicate Immunefi opportunities by stable source identity and semantic fingerprint
+- [x] Track latest Immunefi lifecycle state and preserve changed terms as new evidence versions
+- [x] Add read-only CLI intake with persistent SQLite storage and machine-readable reports
+- [x] Add a hardened daily systemd timer definition for public-source discovery
+- [x] Add explainable read-only research-fit ranking for captured Immunefi listings (not exploit probability or expected payout)
+- [ ] Rank and expire opportunities across additional approved sources
 - [ ] Check eligibility, ownership, terms, and required permissions
 - [ ] Produce an evidence-backed opportunity report
 - [ ] No external commitments, spending, or live financial execution in this phase
@@ -49,6 +55,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Record costs, outcomes, and evidence
 
 ## 4 — Earned Revenue and Agent Workforce
+
+**Funding constraint:** follow [Self-Funded Autonomy](SELF-FUNDED-AUTONOMY.md). OWNERA starts with zero owner-funded operating budget. Paid services may be purchased only from independently verified net revenue; the Sovereign Reserve is never an agent funding source.
+
 
 - [x] Define initial worker/task contract and deterministic in-memory assignment/review lifecycle
 - [x] Add initial SQLite append-only event store with optimistic concurrency and hash-chain verification
@@ -69,7 +78,11 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add fail-closed owner key-control service with verified-principal role checks and actor binding
 - [ ] Integrate production identity provider, phishing-resistant MFA, session revocation, and protected API boundary
 - [ ] Verify customer acceptance against a trusted contract or payment source
-- [ ] Select one narrow service with measurable demand and delivery criteria
+- [ ] Select one narrow paid service with measurable demand and delivery criteria
+- [ ] Add manual-first paid-work lead intake and conservative qualification using the persistent commercial engine
+- [x] Add live NEAR Agent Market bid API integration with bounded USDC policy, dry-run, deterministic proposal generation, concurrency caps, and audit persistence (recurring submission remains disabled)
+- [ ] Enable recurring bids only after unattended assignment execution and payout reconciliation are proven
+- [ ] Validate one current client lead and prepare an owner-approved proposal
 - [x] Define isolated execution environments and bounded worker runtimes (initial digest-pinned Docker adapter)
 - [x] Add opt-in real-Docker acceptance tests and a manually triggered digest-pinned GitHub Actions workflow
 - [x] Reject symlinked parent directories during artifact extraction and cover the boundary with unit tests
@@ -78,7 +91,7 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add SQLite content-addressed worker artifact registry with deduplication, task provenance, size bounds, and read-time SHA-256 verification
 - [x] Run artifact-registry and execution-bridge unit tests and confirm CI
 - [x] Add independent reviewer-side artifact loading, task/worker provenance checks, and SHA-256 verification
-- [x] Run reviewer-side artifact tests and confirm CI
+- [x] Run reviewer-side artifact tests and CI
 - [x] Add evidence-complete worker Quality Gate with criterion-by-criterion review and durable structured reports
 - [x] Run Quality Gate tests and CI
 - [x] Add event-derived worker performance metrics from verified workforce history
@@ -90,7 +103,18 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Run independent review against real Docker-produced artifacts
 - [x] Connect runtime outputs to the artifact registry and persist digest references in task submission evidence
 - [ ] Run the complete path against a real digest-pinned Docker image
-- [ ] Add permitted source adapters and discover real paid work
+- [ ] Implement OpenHands Agent Server adapter for bounded coding tasks; map provider runs and artifacts into OWNERA's existing task/evidence lifecycle
+- [ ] Prove one end-to-end OpenHands coding task with cancellation, timeout, artifact digest verification, independent QA, and persisted acceptance
+- [ ] Add Condor as a separate read-only/dry-run trading provider only after the coding-worker adapter is accepted
+- [x] Add SQLite commercial evidence capture with bounded snapshots, SHA-256 digests, and PENDING-by-default records
+- [x] Add authenticated owner evidence review with reviewer identity binding and per-evidence hash-chained audit
+- [x] Add fail-closed evidence reference validation for accepted evidence belonging to the opportunity
+- [x] Enforce accepted evidence as a mandatory gate inside persistent commercial qualification
+- [x] Add first read-only Immunefi catalog adapter (candidate intake only; no automatic qualification)
+- [x] Run live Immunefi source intake and verify idempotent persistence across repeat imports
+- [x] Add Immunefi source deduplication and semantic change tracking
+- [x] Review one real program against official scope and payout terms; close a non-qualifying local-only hypothesis without submission
+- [ ] Review and validate a second high-fit program with source-code provenance and reproducible local tests
 - [ ] Owner-approved contracts and customer commitments
 - [ ] Deliver work and independent quality review
 - [x] Add owner-attested partial receipt ledger with accepted-amount caps, idempotency, and atomic event persistence
@@ -101,6 +125,11 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Add independently verified payment-provider or on-chain settlement adapters
 - [ ] Verify settlement and calculate realized net profit/loss
 - [ ] Add a capped agent operating budget only after the workflow is proven
+- [ ] Implement independently verified settlement-to-net-revenue reconciliation
+- [ ] Implement atomic allocation across pending receipts, Sovereign Reserve deposits, and earned operating treasury
+- [ ] Implement task-bound expense authorization from earned funds only, with allowlists, hard caps, and idempotent payment receipts
+- [ ] Prove zero-owner-funding bootstrap using free/local infrastructure through first verified customer receipt
+- [ ] Prove automatic operating-budget replenishment from earned net revenue without reserve access
 
 ## 5 — Autonomous Treasury and Capital Allocation
 
@@ -142,3 +171,11 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 OWNERA should evolve into an owner-directed autonomous treasury and agent operation that can discover opportunities, deliver useful work, acquire permitted resources, earn revenue, manage an operating budget, and seek better risk-adjusted use of capital while protecting the owner's assets and preserving an owner-only Sovereign Reserve.
 
 A list of opportunities, a submitted application, a simulated balance, an invoice, a backtest, or a model's profit forecast is not proof of acquired resources or realized profit.
+
+## First revenue execution
+
+The current execution priority is documented in [docs/FIRST-REVENUE-PLAN.md](FIRST-REVENUE-PLAN.md). Paid fixed-scope work is the primary first-revenue channel; bug bounty research remains secondary because payout timing and probability are highly uncertain.
+
+## Paid Work first-revenue path
+
+The manual-first `ownera paid-work` CLI now persists source-backed listings, supports idempotent intake, records conservative economic assessments, and creates proposal drafts only for qualified opportunities. The next priority is to use it on real manually captured leads, then add only source integrations whose terms permit the intended use. Do not expand bounty research until the paid-work pipeline is being used for actual customer acquisition.

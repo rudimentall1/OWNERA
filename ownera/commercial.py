@@ -11,6 +11,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
+from typing import Protocol
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
@@ -58,8 +59,8 @@ class CommercialOpportunity:
             raise ValueError("source_url must be an absolute HTTP(S) URL")
         if self.budget_min < 0 or self.budget_max < self.budget_min:
             raise ValueError("invalid opportunity budget range")
-        if len(self.currency) != 3 or not self.currency.isalpha():
-            raise ValueError("currency must be a three-letter code")
+        if (len(self.currency) != 3 and self.currency != "USDC") or not self.currency.isalpha():
+            raise ValueError("currency must be a three-letter code or USDC")
         if not self.required_capabilities:
             raise ValueError("required_capabilities cannot be empty")
         if not self.evidence_refs or any(not item.strip() for item in self.evidence_refs):
@@ -134,14 +135,32 @@ class ProposalDraft:
             raise ValueError("currency must be a three-letter code")
 
 
+class CommercialEvidenceGate(Protocol):
+    """Validates that an opportunity's evidence was accepted by its owner."""
+
+    def require_accepted(
+        self,
+        opportunity_id: UUID,
+        evidence_refs: tuple[str, ...],
+        *,
+        expected_source_url: str | None = None,
+    ) -> None:
+        ...
+
+
 class CommercialEngine:
     """In-memory opportunity pipeline with conservative economics and approval gates."""
 
-    def __init__(self) -> None:
+    def __init__(self, evidence_gate: CommercialEvidenceGate | None = None) -> None:
+        self._evidence_gate = evidence_gate
         self._opportunities: dict[UUID, CommercialOpportunity] = {}
         self._assessments: dict[UUID, CommercialAssessment] = {}
         self._results: dict[UUID, QualificationResult] = {}
         self._proposals: dict[UUID, ProposalDraft] = {}
+
+    def set_evidence_gate(self, evidence_gate: CommercialEvidenceGate | None) -> None:
+        """Attach the fail-closed evidence gate used for future assessments."""
+        self._evidence_gate = evidence_gate
 
     @property
     def opportunities(self) -> tuple[CommercialOpportunity, ...]:
@@ -175,6 +194,16 @@ class CommercialEngine:
         net_margin = net_profit / revenue if revenue > 0 else Decimal("-1")
         risk_adjusted = net_profit * assessment.win_probability
         reasons: list[str] = []
+
+        if self._evidence_gate is not None:
+            try:
+                self._evidence_gate.require_accepted(
+                    opportunity.opportunity_id,
+                    opportunity.evidence_refs,
+                    expected_source_url=opportunity.source_url,
+                )
+            except (PermissionError, RuntimeError):
+                reasons.append("evidence_not_owner_accepted")
 
         if opportunity.deadline is not None and opportunity.deadline <= current_time:
             reasons.append("deadline_expired")

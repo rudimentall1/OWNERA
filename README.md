@@ -14,7 +14,7 @@ The long-term goal is an owner-controlled agent operation that can find useful w
 
 The agent is powerful by design, but its authority and execution are constrained by deterministic security and policy controls.
 
-See [Worker Runtime Isolation](docs/WORKER-RUNTIME-ISOLATION.md) for the opt-in digest-pinned Docker execution boundary and real-container acceptance workflow. See [Resource Autonomy](docs/RESOURCE-AUTONOMY.md) for the Resource Autonomy Engine direction, [Commercial Engine](docs/COMMERCIAL-ENGINE.md) for opportunity qualification and owner-approved proposals, [Commercial Persistence](docs/COMMERCIAL-PERSISTENCE.md) for durable commercial pipeline recovery, [Order-to-Workforce Handoff](docs/ORDER-HANDOFF.md) for customer-approved order conversion, [Persistent Core](docs/PERSISTENT-CORE.md) for durable event storage, [Workforce Persistence](docs/WORKFORCE-PERSISTENCE.md) for versioned workforce snapshots and recovery, [Workforce Engine](docs/WORKFORCE-ENGINE.md) for task coordination, and [Resource Intelligence research](docs/RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the unclaimed-resource market investigation.
+See [External Agent Provider Adoption](docs/EXTERNAL-AGENT-PROVIDER-ADOPTION.md) for the fixed decision on reusing OpenHands as a coding-worker provider and Condor as a separate trading provider. See [Worker Runtime Isolation](docs/WORKER-RUNTIME-ISOLATION.md) for the opt-in digest-pinned Docker execution boundary and real-container acceptance workflow. See [Resource Autonomy](docs/RESOURCE-AUTONOMY.md) for the Resource Autonomy Engine direction, [Commercial Engine](docs/COMMERCIAL-ENGINE.md) for opportunity qualification and owner-approved proposals, [Commercial Persistence](docs/COMMERCIAL-PERSISTENCE.md) for durable commercial pipeline recovery, [Order-to-Workforce Handoff](docs/ORDER-HANDOFF.md) for customer-approved order conversion, [Persistent Core](docs/PERSISTENT-CORE.md) for durable event storage, [Workforce Persistence](docs/WORKFORCE-PERSISTENCE.md) for versioned workforce snapshots and recovery, [Workforce Engine](docs/WORKFORCE-ENGINE.md) for task coordination, and [Resource Intelligence research](docs/RESOURCE-INTELLIGENCE-MARKET-RESEARCH.md) for the unclaimed-resource market investigation.
 
 ## Core Principles
 
@@ -140,3 +140,39 @@ OWNERA will not give a language model unrestricted access to production private 
 ## License
 
 TBD.
+
+
+## Read-only opportunity discovery
+
+After installing OWNERA with its project dependencies, run the first public-source intake:
+
+```bash
+ownera discover-immunefi --database /var/lib/ownera/ownera.sqlite3 --format json
+```
+
+Use `--payload-file path/to/catalog.json` to replay a saved catalog without network access. The command stores bounded PENDING evidence in SQLite and prints a machine-readable report. Repeated imports reuse unchanged evidence. A listed maximum bounty is only a ceiling, not expected revenue. This command does not scan targets, submit reports, contact programs, or move funds.
+
+
+## Opportunity Intelligence
+
+Generate an explainable research shortlist from captured Immunefi evidence:
+
+```bash
+ownera rank-immunefi --limit 10
+ownera rank-immunefi --format json
+```
+
+The score is a research-fit heuristic, not exploit probability, eligibility, expected payout, or revenue. It reads the evidence database without changing it. Review the [Charm Alpha Vaults V2 triage](docs/research/IMMUNEFI-CHARM-TRIAGE.md) for the first manually checked candidate.
+
+## Paid Work MVP
+
+The primary first-revenue path is a manual-first paid-work pipeline built on the persistent Commercial Engine:
+
+```bash
+ownera paid-work ingest --payload-file listing.json
+ownera paid-work list
+ownera paid-work assess --opportunity-id <UUID> --delivery-cost 5000 --platform-fee-rate 0.10 --contingency-rate 0.10 --win-probability 0.50 --minimum-net-margin 0.20 --terms-reviewed --eligibility-confirmed
+ownera paid-work draft --payload-file proposal.json
+```
+
+It captures evidence-backed listings, calculates conservative economics, and prepares owner-reviewable proposal drafts. It does not scrape marketplaces, contact customers, submit proposals, execute work, or record revenue. See [Paid Work MVP](docs/PAID-WORK-MVP.md).

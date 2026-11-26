@@ -1,8 +1,8 @@
 # OWNERA Commercial Engine
 
-**Status:** Initial deterministic, in-memory opportunity qualification and proposal approval core implemented. No marketplace connectors, outbound messaging, contract signing, persistence, or payment processing are implemented.  
-**Code:** `ownera/commercial.py`  
-**Tests:** `tests/test_commercial.py`
+**Status:** Deterministic qualification and proposal approval core implemented, with SQLite snapshot persistence and append-only commercial events through `PersistentCommercialEngine`. A manual-first intake/assessment/draft CLI is available through `PaidWorkPipeline`. Marketplace discovery connectors, outbound proposal submission, contract signing, customer acceptance verification, and payment processing are not implemented.
+**Code:** `ownera/commercial.py`, `ownera/persistent_commercial.py`, `ownera/paid_work.py`
+**Tests:** `tests/test_commercial.py`, `tests/test_paid_work.py`
 
 ## Purpose
 
@@ -105,27 +105,23 @@ An owner must explicitly approve the proposal before it can enter `APPROVED_FOR_
 
 ## Next gates
 
-### 1. Persistence and audit
+### 1. Source adapters
 
-Persist opportunities, assessments, proposal versions, approval identity, timestamps and state transitions. Add idempotency and append-only evidence.
+Manual-first intake is available through `ownera paid-work ingest`; the persistent qualification and proposal draft path is available through `ownera paid-work assess` and `ownera paid-work draft`. No paid-work marketplace connector is currently deployed. Add one permitted source connector only after confirming its terms and stable access method. Do not scrape behind authentication or bypass platform controls.
 
-### 2. Source adapters
-
-Start with manually curated, owner-provided Kwork leads and public listing URLs. Add one permitted source connector only after confirming its terms and stable access method. Do not scrape behind authentication or bypass platform controls.
-
-### 3. Real cost estimation
+### 2. Real cost estimation
 
 Use historical delivery time, model/tool usage, platform fees, revisions, taxes/withholding assumptions and refund/dispute risk. Track estimated versus actual cost per order.
 
-### 4. Proposal quality
+### 3. Proposal quality
 
 Add service templates with fixed scope, exclusions, milestones, delivery time, revision limits, acceptance tests and handover requirements. Human review remains mandatory.
 
-### 5. Approved outbound adapter
+### 4. Approved outbound adapter
 
-Only after persistence, audit, policy integration and idempotency exist. It must submit exactly the approved proposal version and record the external response.
+Only after production owner identity, phishing-resistant authentication, policy integration, approval binding and idempotency are in place. It must submit exactly the approved proposal version and record the external response.
 
-### 6. Order-to-workforce handoff
+### 5. Order-to-workforce handoff
 
 Convert an accepted, owner-approved customer order into a bounded task graph with capability requirements, dependencies, per-task budgets and independent QA.
 
