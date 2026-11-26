@@ -91,7 +91,7 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [x] Add SQLite content-addressed worker artifact registry with deduplication, task provenance, size bounds, and read-time SHA-256 verification
 - [x] Run artifact-registry and execution-bridge unit tests and confirm CI
 - [x] Add independent reviewer-side artifact loading, task/worker provenance checks, and SHA-256 verification
-- [x] Run reviewer-side artifact tests and confirm CI
+- [x] Run reviewer-side artifact tests and CI
 - [x] Add evidence-complete worker Quality Gate with criterion-by-criterion review and durable structured reports
 - [x] Run Quality Gate tests and CI
 - [x] Add event-derived worker performance metrics from verified workforce history
@@ -103,6 +103,9 @@ The roadmap is deliberately ordered by safety. Autonomy expands only after the u
 - [ ] Run independent review against real Docker-produced artifacts
 - [x] Connect runtime outputs to the artifact registry and persist digest references in task submission evidence
 - [ ] Run the complete path against a real digest-pinned Docker image
+- [ ] Implement OpenHands Agent Server adapter for bounded coding tasks; map provider runs and artifacts into OWNERA's existing task/evidence lifecycle
+- [ ] Prove one end-to-end OpenHands coding task with cancellation, timeout, artifact digest verification, independent QA, and persisted acceptance
+- [ ] Add Condor as a separate read-only/dry-run trading provider only after the coding-worker adapter is accepted
 - [x] Add SQLite commercial evidence capture with bounded snapshots, SHA-256 digests, and PENDING-by-default records
 - [x] Add authenticated owner evidence review with reviewer identity binding and per-evidence hash-chained audit
 - [x] Add fail-closed evidence reference validation for accepted evidence belonging to the opportunity
