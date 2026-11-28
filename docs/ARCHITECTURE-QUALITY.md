@@ -78,3 +78,9 @@ The analyzer completed with exit code `1` and reported **8 diagnostics**:
 The six field diagnostics concern `AuthorityArtifact.decision`, repository event-store access in the commercial/workforce facades, sandbox firewall audit/ledger access, and the investment sandbox portfolio read. These are review targets, not confirmed defects. The two directory-size findings are structural warnings, not a reason to split files mechanically.
 
 The normal OWNERA CI run `46112270513` passed for the same branch head. The architecture result is separate from application tests. No source code was changed to address this baseline; no diagnostic was suppressed. Keep this section as a dated snapshot, not as a claim about later commits.
+
+## Final pilot verification — 2026-11-28
+
+The configuration/documentation head `435c99b66effa727e121bbd264d8dde2bca8f0b4` passed the normal OWNERA CI run [46112383069](https://github.com/rudimentall1/OWNERA/actions/runs/46112383069). The final advisory architecture workflow run [46112383085](https://github.com/rudimentall1/OWNERA/actions/runs/46112383085) successfully installed the pinned tool and SCIP indexer, completed the scan, and uploaded the report. The analyzer returned exit code `1` with the same **8 diagnostics** recorded above; it did not report a clean architecture baseline. The report artifact is [15250335709](https://github.com/rudimentall1/OWNERA/actions/runs/46112383085/artifacts/15250335709).
+
+This final run confirms the corrected install command and the current GitHub Actions runtime versions. No application source changes or diagnostic suppressions were introduced.
