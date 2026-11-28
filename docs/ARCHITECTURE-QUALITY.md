@@ -63,3 +63,18 @@ The Python SCIP index is cached outside the repository under the user's cache di
 - SCIP indexing can resolve fewer references in untyped or dynamically typed code; absence of a finding is not proof that a dependency or encapsulation problem does not exist.
 - The tool does not audit financial logic, authorization, cryptography, dependency vulnerabilities, secrets, or runtime isolation.
 - It does not replace Ruff, pytest, integration acceptance, threat-model review, or human code review.
+
+## Initial baseline — 2026-11-28
+
+The first completed scan ran as [Architecture Audit run 46112270051](https://github.com/rudimentall1/OWNERA/actions/runs/46112270051) against source head `c3efc4ad967ee62d3a0943cd9c3d9380e9a6829d`.
+
+The analyzer completed with exit code `1` and reported **8 diagnostics**:
+
+| Lint | Count | Initial locations |
+|---|---:|---|
+| `field-leak` | 6 | `authority_contract.py`, `persistent_commercial.py`, `sandbox.py`, `treasury_cycle.py`, `persistent_workforce.py` / `worker_performance.py` |
+| `wide-directory` | 2 | `ownera/`, `tests/` |
+
+The six field diagnostics concern `AuthorityArtifact.decision`, repository event-store access in the commercial/workforce facades, sandbox firewall audit/ledger access, and the investment sandbox portfolio read. These are review targets, not confirmed defects. The two directory-size findings are structural warnings, not a reason to split files mechanically.
+
+The normal OWNERA CI run `46112270513` passed for the same branch head. The architecture result is separate from application tests. No source code was changed to address this baseline; no diagnostic was suppressed. Keep this section as a dated snapshot, not as a claim about later commits.
